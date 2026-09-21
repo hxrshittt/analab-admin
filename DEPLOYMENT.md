@@ -1,142 +1,60 @@
-# Deploy Analab Website + Admin Dashboard
+# Deploying Analab (website + admin) on Render
 
-This is a Node.js app with an admin dashboard. GitHub Pages cannot host it (only static files). 
+This is a Node.js app. GitHub Pages cannot host it (static files only).
 
-**Best option: Render.com (free tier with persistent storage)**
+## Important: pick the right Render plan
 
----
+Render's **Free** instance has an ephemeral filesystem. Uploaded installers, the release list
+and the admin login are stored on disk, so on Free they are **lost on every redeploy, restart
+and idle spin-down (after 15 minutes without traffic)**.
 
-## Step 1: Push to GitHub
+To keep uploads, use a **paid instance type** and attach a **persistent disk**
+(persistent disks are not available on Free web services).
 
-Go to your computer in the `analab` folder:
-
-```bash
-cd C:\Users\rnd-2\Downloads\git-ready\analab
-```
-
-(Or wherever this folder is.)
-
-Then:
+## 1. Push the code to GitHub
 
 ```bash
-git init
 git add .
-git commit -m "Analab with admin dashboard"
-git branch -M main
-git remote add origin https://github.com/hxrshittt/analab-admin.git
-git push -u origin main
+git commit -m "Update Analab"
+git push
 ```
 
-(Or replace `analab-admin` with whatever repo name you want.)
+## 2. Create the Render web service
 
----
+1. Render dashboard -> **New** -> **Web Service** -> connect the GitHub repo.
+2. Runtime: **Node**. Build command: `npm install`. Start command: `npm start`.
+3. Instance type: a **paid** type (needed for the disk).
+4. **Environment** variables:
+   - `TRUST_PROXY` = `1`
+   - `ADMIN_USERNAME` = your username
+   - `ADMIN_PASSWORD` = a strong password (used the first time the admin account is created)
+   - `DATA_DIR` = `/var/data/data`
+   - `UPLOAD_DIR` = `/var/data/uploads`
+5. **Disks** -> **Add disk**: mount path `/var/data`, size 1 GB or more (installers live here,
+   so size it for your files; a disk can be enlarged later but not shrunk).
+6. Save. Render redeploys and the disk becomes available once the deploy is live.
 
-## Step 2: Deploy to Render
+Public site: `https://<your-service>.onrender.com`
+Admin: `https://<your-service>.onrender.com/admin`
 
-1. Go to **https://render.com** and sign up (use GitHub login).
+## 3. Publish your first version
 
-2. Click **New** → **Web Service**.
+The site starts at version **0.0.0** (nothing published). In `/admin` click **New release**,
+set the version (for example `1.0.0`), add notes, drop the installer, and click **Publish release**.
 
-3. Connect your repository (`hxrshittt/analab-admin` or whatever you named it).
+## 4. Updating later
 
-4. Fill in:
-   - **Name:** `analab-website`
-   - **Runtime:** Node.js
-   - **Build command:** `npm install`
-   - **Start command:** `npm start`
-   - **Instance Type:** Free
-   - **Region:** Pick closest to you
+- **New version of your software:** sign in at `/admin` and publish a new release. No code change or redeploy needed.
+- **Changing the website code:** edit the files, then `git add .`, `git commit`, `git push`.
+  Render redeploys automatically. Data on the persistent disk is kept.
 
-5. **Environment:**
-   - Add `TRUST_PROXY=1`
-   - Add `ADMIN_USERNAME=admin`
-   - Add `ADMIN_PASSWORD=YourPassword123` (or leave empty for random)
+## Forgot the admin password?
 
-6. **Disk:** Add a persistent disk:
-   - Mount path: `/var/data`
-   - Set `DATA_DIR=/var/data/analab/data`
-   - Set `UPLOAD_DIR=/var/data/analab/uploads`
+The password is only read from `ADMIN_PASSWORD` when the admin account is first created.
+To reset it, run `npm run reset-admin` in a shell on the service (or delete `data/admin.json`
+on the disk and restart) and use the login it prints.
 
-7. Click **Create Web Service**.
+## Other hosts
 
-Wait 3-5 minutes. Render will give you a URL like:
-```
-https://analab-website.onrender.com
-```
-
-Your site is live:
-- **Public site:** https://analab-website.onrender.com
-- **Admin login:** https://analab-website.onrender.com/admin
-
----
-
-## Step 3: First Login
-
-1. Go to `/admin`
-2. Username: `admin`
-3. Password: whatever you set in Step 2 (or check Render logs for the random one)
-
----
-
-## Step 4: Publish Your First Version
-
-1. Sign in
-2. Click **New release**
-3. Version: `1.3.0`
-4. Release date: Today
-5. Notes:
-   ```
-   - Improved reference comparison workflow.
-   - Improved reconnect handling for data capture.
-   - Faster analysis for longer test runs.
-   ```
-6. **Drop your installer** (`.exe` or `.msi`)
-7. Click **Publish release**
-
-Everything updates automatically.
-
----
-
-## Every Update After That
-
-1. Sign in at `/admin`
-2. Click **New release**
-3. Set version, notes, drop installer
-4. **Publish**
-
-Done. No code changes needed.
-
----
-
-## Troubleshooting
-
-**"Build failed"**
-→ Check Render logs. Make sure `package.json` and `server.js` are in the root of your repo.
-
-**"Site won't start"**
-→ Check logs. Common: missing `node_modules` (should auto-install), or wrong `TRUST_PROXY` setting.
-
-**"Uploads disappeared after redeploy"**
-→ You need the persistent disk. Render free tier has ephemeral storage. See Step 2, the Disk section.
-
-**"I forgot my admin password"**
-→ In the Render dashboard, go to **Shell**, run:
-```
-npm run reset-admin
-```
-It will print the new login.
-
----
-
-## If You Want to Use a Different Host
-
-Works the same on:
-- **Railway.app** (very similar to Render)
-- **Fly.io** (bare metal, more control)
-- **Heroku** (paid, but works well)
-- **A Windows/Linux server** (just `npm start`)
-
-All of them need:
-- Node.js 18+
-- Persistent storage for `data/` and `uploads/`
-- HTTPS in front (for security)
+Railway, Fly.io, a VPS, or your own Windows/Linux server also work. They need Node 18+,
+persistent storage for the data and upload folders, and HTTPS in front.

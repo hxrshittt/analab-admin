@@ -6,10 +6,16 @@ sign in, change the version, and upload the installer. The public pages
 
 ## Run it
 
+**Windows (easiest):** double-click `start.bat`. It installs everything the first time and opens the admin page.
+
+Or from a terminal:
+
 ```bash
 npm install
 npm start
 ```
+
+If PowerShell says *running scripts is disabled*, use `npm.cmd install` and `npm.cmd start`, or open Command Prompt (cmd) instead of PowerShell.
 
 - Website: http://localhost:3000
 - Admin:   http://localhost:3000/admin
@@ -21,6 +27,18 @@ time from **Account** inside the dashboard. There is no registration page:
 there is only this one admin login.
 
 Forgot the password? Run `npm run reset-admin` (creates a new login and prints it).
+
+## Default version and update checks
+
+Until you publish a release, the site and `GET /api/latest` report version **0.0.0**
+(defined as `DEFAULT_VERSION` in `server.js`). Your software can ignore 0.0.0 and only
+offer an update when the reported version is higher than the installed one
+(compare each number separately, so 1.10.0 is higher than 1.9.0).
+
+`/api/latest` returns JSON with `version`, `date`, `whatsNew`, `fixes`, `file.sha256`
+and `downloadUrl` (a path like `/download/<id>`).
+
+Already ran an older copy? Delete `data/db.json` and restart to get the 0.0.0 default again.
 
 ## Publishing a new version
 

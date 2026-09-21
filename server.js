@@ -56,19 +56,15 @@ function writeJson(file, obj) {
 }
 const rid = (p) => p + crypto.randomBytes(5).toString('hex');
 
+// Default state: one placeholder release, version 0.0.0 (no installer).
+// Your software can treat 0.0.0 as "nothing published yet" and only update when the version goes higher.
+const DEFAULT_VERSION = '0.0.0';
 function seedDb() {
-  const mk = (version, date, whatsNew, fixes = []) => ({
-    id: rid('r_'), version, date, whatsNew, fixes, file: null, downloads: 0, createdAt: new Date().toISOString(),
-  });
-  const releases = [
-    mk('1.3.0', '2026-09-18',
-      ['Improved reference comparison workflow', 'Improved reconnect handling for data capture', 'Faster analysis for longer test runs'],
-      ['Reporting and display refinements', 'Minor UI corrections']),
-    mk('1.2.0', '2026-08-18', ['Graph navigation improvements', 'Comparison enhancements'], ['Bug fixes and UI refinements']),
-    mk('1.1.0', '2026-07-15', ['Stability improvements', 'Reporting improvements']),
-    mk('1.0.0', '2026-06-20', ['Initial Analab release']),
-  ];
-  return { latestId: releases[0].id, releases };
+  const release = {
+    id: rid('r_'), version: DEFAULT_VERSION, date: new Date().toISOString().slice(0, 10),
+    whatsNew: [], fixes: [], file: null, downloads: 0, createdAt: new Date().toISOString(),
+  };
+  return { latestId: release.id, releases: [release] };
 }
 if (!fs.existsSync(DB_FILE)) writeJson(DB_FILE, seedDb());
 let db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));

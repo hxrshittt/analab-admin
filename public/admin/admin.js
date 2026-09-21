@@ -131,8 +131,10 @@
           '<span class="chip">' + fmtSize(live.file.size) + '</span>' +
           '<span class="chip"><span class="mono" title="' + esc(live.file.sha256) + '">SHA-256 ' + esc(shortHash(live.file.sha256)) + '</span>' +
           '<button type="button" data-copy="' + esc(live.file.sha256) + '" title="Copy full checksum" aria-label="Copy full checksum">' + I.copy + '</button></span>'
-        : '<span class="chip warn">' + I.alert + '<span>No installer uploaded. Visitors can’t download this version yet.</span></span>' +
-          '<a class="btn btn-light btn-sm" href="#/edit/' + live.id + '">Upload installer</a>';
+        : (live.version === '0.0.0'
+          ? '<span class="chip">' + I.alert + '<span>Default placeholder. Publish your first real release to replace it.</span></span>'
+          : '<span class="chip warn">' + I.alert + '<span>No installer uploaded. Visitors can’t download this version yet.</span></span>' +
+            '<a class="btn btn-light btn-sm" href="#/edit/' + live.id + '">Upload installer</a>');
       liveHtml =
         '<section class="live">' + liveCurve() +
         '<div class="live-top"><div>' +
