@@ -55,16 +55,14 @@ release notes across the site all update immediately. You can also **Make live**
 
 ## Deploying
 
-This needs a Node.js host. **GitHub Pages cannot run it** (it only serves static files).
-Any of these work: Render, Railway, Fly.io, a VPS, or a Windows/Linux server.
+This needs a Node.js host. **GitHub Pages cannot run it.** See `DEPLOYMENT.md` for step by step Render instructions.
 
-- Start command: `npm start`
+- **Free (Render Free plan):** set `GITHUB_REPO` and `GITHUB_TOKEN`. Releases and installers are then stored as
+  GitHub Releases in your repo, so nothing is lost when Render restarts or sleeps. Set `ADMIN_PASSWORD` too.
+- **Paid / your own server:** leave those two empty. Installers and data are saved on disk in `uploads/` and `data/`.
+  On Render attach a persistent disk and set `DATA_DIR` and `UPLOAD_DIR` to it.
 - Set `TRUST_PROXY=1` when the host provides HTTPS in front of the app.
-- Installers and data are saved on disk in `uploads/` and `data/`. On hosts with
-  ephemeral disks (most free tiers) attach a **persistent disk/volume** and point
-  `DATA_DIR` and `UPLOAD_DIR` at it, otherwise uploads disappear on redeploy.
-- Back up `data/` and `uploads/` to keep your releases safe.
-- Upload size limit is 2 GB by default (`MAX_UPLOAD_MB`). Some proxies (for example
+- Upload size limit is 2 GB by default (`MAX_UPLOAD_MB`, GitHub allows up to 2000). Some proxies (for example
   Cloudflare's free plan, 100 MB) cap request size before it reaches the app.
 
 ## Security notes

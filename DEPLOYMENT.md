@@ -2,59 +2,68 @@
 
 This is a Node.js app. GitHub Pages cannot host it (static files only).
 
-## Important: pick the right Render plan
+Render's **Free** plan wipes the server's disk on every redeploy, restart and idle spin-down
+(a free service sleeps after 15 minutes without traffic). So there are two ways to run this:
 
-Render's **Free** instance has an ephemeral filesystem. Uploaded installers, the release list
-and the admin login are stored on disk, so on Free they are **lost on every redeploy, restart
-and idle spin-down (after 15 minutes without traffic)**.
+| | Storage | Render plan | Cost |
+|---|---|---|---|
+| **A. GitHub mode (recommended)** | Releases + installers saved as GitHub Releases in your repo | Free | Free |
+| B. Local disk mode | Installers saved on the server's disk | Paid + persistent disk | Paid |
 
-To keep uploads, use a **paid instance type** and attach a **persistent disk**
-(persistent disks are not available on Free web services).
+The admin dashboard works the same in both.
 
-## 1. Push the code to GitHub
+---
 
-```bash
-git add .
-git commit -m "Update Analab"
-git push
-```
+## A. Free: GitHub mode
 
-## 2. Create the Render web service
+Your **repo must be public** (visitors download installers straight from GitHub's servers).
 
-1. Render dashboard -> **New** -> **Web Service** -> connect the GitHub repo.
-2. Runtime: **Node**. Build command: `npm install`. Start command: `npm start`.
-3. Instance type: a **paid** type (needed for the disk).
-4. **Environment** variables:
-   - `TRUST_PROXY` = `1`
-   - `ADMIN_USERNAME` = your username
-   - `ADMIN_PASSWORD` = a strong password (used the first time the admin account is created)
-   - `DATA_DIR` = `/var/data/data`
-   - `UPLOAD_DIR` = `/var/data/uploads`
-5. **Disks** -> **Add disk**: mount path `/var/data`, size 1 GB or more (installers live here,
-   so size it for your files; a disk can be enlarged later but not shrunk).
-6. Save. Render redeploys and the disk becomes available once the deploy is live.
+### 1. Create a GitHub token
+1. GitHub -> your profile picture -> **Settings** -> **Developer settings** -> **Personal access tokens** -> **Fine-grained tokens** -> **Generate new token**.
+2. Name: `analab-admin`. Expiration: choose the longest you are comfortable with (you must make a new token when it expires).
+3. **Repository access**: *Only select repositories* -> pick your Analab repo.
+4. **Permissions** -> **Repository permissions** -> **Contents: Read and write**.
+5. Click **Generate token** and copy it (it starts with `github_pat_`). You only see it once.
 
-Public site: `https://<your-service>.onrender.com`
-Admin: `https://<your-service>.onrender.com/admin`
+### 2. Set Render environment variables
+Render dashboard -> your service -> **Environment**:
 
-## 3. Publish your first version
+| Key | Value |
+|---|---|
+| `GITHUB_REPO` | `your-username/your-repo` (for example `hxrshittt/analab-admin`) |
+| `GITHUB_TOKEN` | the token from step 1 |
+| `ADMIN_USERNAME` | your admin username |
+| `ADMIN_PASSWORD` | a strong password (**required**, it is read on every start) |
+| `TRUST_PROXY` | `1` |
 
-The site starts at version **0.0.0** (nothing published). In `/admin` click **New release**,
-set the version (for example `1.0.0`), add notes, drop the installer, and click **Publish release**.
+Save. Render redeploys. In **Logs** you should see `Release storage: GitHub Releases (...)` and `GitHub connected`.
 
-## 4. Updating later
+### 3. Publish
+Sign in at `/admin` -> **New release** -> set version, notes, drop the installer -> **Publish release**.
+The release appears under your repo's **Releases** page on GitHub and on your website.
 
-- **New version of your software:** sign in at `/admin` and publish a new release. No code change or redeploy needed.
-- **Changing the website code:** edit the files, then `git add .`, `git commit`, `git push`.
-  Render redeploys automatically. Data on the persistent disk is kept.
+Nothing important is stored on Render, so restarts and redeploys lose nothing.
 
-## Forgot the admin password?
+Notes:
+- The very first visit after the service slept takes about a minute to load. That is Render's free plan.
+- To change your admin login, edit `ADMIN_USERNAME` / `ADMIN_PASSWORD` in Render and save.
+- The version number can't be edited after publishing (delete the release and publish again).
+- You can also create a release by hand on GitHub (tag like `v1.2.0`, attach the installer). The site picks it up within about 30 seconds.
+- If a very large upload through Render times out, publish it by hand on GitHub as above.
 
-The password is only read from `ADMIN_PASSWORD` when the admin account is first created.
-To reset it, run `npm run reset-admin` in a shell on the service (or delete `data/admin.json`
-on the disk and restart) and use the login it prints.
+---
 
-## Other hosts
+## B. Paid: local disk mode
 
-Railway, Fly.io, a VPS, or your own Windows/Linux server also work. They need Node 18+,
-persistent storage for the data and upload folders, and HTTPS in front.
+1. Use a **paid** Render instance type and add a **Disk** mounted at `/var/data`.
+2. Environment: `TRUST_PROXY=1`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `DATA_DIR=/var/data/data`, `UPLOAD_DIR=/var/data/uploads`.
+   Do **not** set `GITHUB_REPO` / `GITHUB_TOKEN`.
+3. Publish from `/admin` the same way. Installers are stored on the disk.
+
+---
+
+## Updating the website code
+Edit the files, then `git add .`, `git commit -m "message"`, `git push`. Render redeploys automatically.
+
+## Default version
+Until you publish a release the site and `GET /api/latest` report `0.0.0`.
