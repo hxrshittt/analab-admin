@@ -1,0 +1,231 @@
+/* =====================================================================
+   Analab product layer
+   1. Product switcher (liquid glass)  - shared by every page
+   2. Titrator theme                   - re-colours the shared components
+   3. Titrator components              - live titration demo, step list
+   ===================================================================== */
+
+:root{--hdr:92px}
+
+/* ---------------------------------------------------------------------
+   1. Product switcher
+   A floating glass control that sits centred under the navigation bar and stays put while the page scrolls,
+   so content passes underneath it and is blurred by the glass.
+   --------------------------------------------------------------------- */
+.product-bar{position:sticky;top:var(--hdr);height:0;z-index:40;display:flex;justify-content:center;pointer-events:none}
+.pswitch-wrap{position:relative;margin-top:16px}
+
+/* two soft lights behind the glass, one per product, so the glass has something to bend */
+.pswitch-wrap .orb{position:absolute;top:8px;width:116px;height:40px;border-radius:50%;filter:blur(14px);opacity:.6;pointer-events:none}
+.orb-t{left:26px;background:#22c7b4}
+.orb-d{right:26px;background:#3d8df2}
+
+.pswitch{
+  --tintc:#1268d8;--pos:1;
+  position:relative;display:grid;grid-template-columns:1fr 1fr;padding:4px;border-radius:999px;pointer-events:auto;
+  touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  background:linear-gradient(180deg,rgba(255,255,255,.68),rgba(255,255,255,.36));
+  -webkit-backdrop-filter:blur(18px) saturate(190%);backdrop-filter:blur(18px) saturate(190%);
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.95),
+    inset 0 -1px 1px rgba(255,255,255,.4),
+    0 12px 32px rgba(16,52,98,.16),
+    0 2px 6px rgba(16,52,98,.08);
+}
+.pswitch[data-active="titrator"]{--tintc:#0a9c8f;--pos:0}
+.pswitch[data-active="decay-analyzer"]{--tintc:#1268d8;--pos:1}
+/* arriving from the other product: start where the glass was, then slide across (see product.js) */
+html[data-ps-from="titrator"] .pswitch{--tintc:#0a9c8f;--pos:0}
+html[data-ps-from="decay-analyzer"] .pswitch{--tintc:#1268d8;--pos:1}
+
+.pswitch-opt{
+  position:relative;z-index:2;display:flex;align-items:center;justify-content:center;height:44px;min-width:154px;padding:0 22px;
+  border-radius:999px;font:600 14px/1 Inter,Arial,sans-serif;letter-spacing:-.1px;white-space:nowrap;color:#48678a;
+  transition:color .3s ease;-webkit-user-drag:none;
+}
+.pswitch-opt:hover{color:#1c3e63}
+.pswitch-opt[aria-current="page"]{color:#0e2b4d}
+.pswitch.is-dragging .pswitch-opt{color:#48678a}
+.pswitch.is-dragging .pswitch-opt.hot{color:#0e2b4d}
+.pswitch-opt:focus-visible{outline:2px solid var(--tintc);outline-offset:-3px}
+
+/* the sliding glass lens */
+.pswitch-thumb{
+  position:absolute;z-index:1;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 2);border-radius:999px;pointer-events:none;
+  translate:calc(var(--pos) * 100%) 0;scale:var(--s,1);
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.52));
+  -webkit-backdrop-filter:blur(4px) saturate(230%) brightness(1.07);backdrop-filter:blur(4px) saturate(230%) brightness(1.07);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.75),
+    inset 1.5px 2px 3px rgba(255,255,255,.95),
+    inset -2px -3px 7px rgba(18,58,108,.11),
+    0 8px 20px rgba(16,52,98,.2),
+    0 1px 3px rgba(16,52,98,.16);
+  transition:
+    translate .6s cubic-bezier(.3,1.32,.46,1),
+    scale .38s cubic-bezier(.3,1.45,.5,1),
+    background .3s ease,
+    box-shadow .3s ease;
+}
+/* colour of the selected product, tinting the glass */
+.pswitch-thumb:before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--tintc);opacity:.2;transition:background-color .5s ease}
+/* specular highlight along the top edge */
+.pswitch-thumb:after{content:"";position:absolute;left:14%;right:14%;top:3px;height:42%;border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,0));pointer-events:none}
+
+/* finger down: the lens lifts, grows and turns more transparent, like iOS */
+.pswitch.is-pressed .pswitch-thumb{
+  --s:1.1;
+  background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.2));
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.85),
+    inset 2px 3px 4px rgba(255,255,255,.95),
+    inset -2px -4px 9px rgba(18,58,108,.12),
+    0 14px 30px rgba(16,52,98,.26),
+    0 2px 5px rgba(16,52,98,.16);
+}
+/* while dragging the lens follows the finger with no lag */
+.pswitch.is-dragging .pswitch-thumb{transition:scale .38s cubic-bezier(.3,1.45,.5,1),background .3s ease,box-shadow .3s ease}
+
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .pswitch{background:rgba(255,255,255,.9)}
+  .pswitch-thumb{background:#fff}
+}
+
+/* room for the floating switcher under the header */
+.product-bar + main > .hero .hero-grid{padding-top:46px}
+.product-bar + main > .section:first-child{padding-top:104px}
+
+/* pages that have no release yet should not claim a release date */
+.no-release [data-hide-unreleased]{display:none}
+
+@media(max-width:700px){
+  :root{--hdr:76px}
+  .pswitch-opt{min-width:0;padding:0 10px;font-size:13px;height:42px}
+  .pswitch{width:min(340px,calc(100vw - 32px))}
+  .pswitch-wrap .orb{width:90px}
+  .orb-t{left:20px}.orb-d{right:20px}
+  .product-bar + main > .section:first-child{padding-top:92px}
+}
+@media(prefers-reduced-motion:reduce){
+  .pswitch-thumb,.pswitch-thumb:before,.pswitch-opt{transition:none!important}
+}
+
+/* ---------------------------------------------------------------------
+   2. Titrator theme
+   Same layout and components as Decay Analyzer, teal instead of blue.
+   --------------------------------------------------------------------- */
+[data-product="titrator"]{
+  --accent:#0a9c8f;--accent-d:#087e73;--accent-deep:#065b54;--accent-soft:#8fd6cc;
+  --accent-pale:#e4f6f3;--accent-pale2:#f2fbfa;--accent-line:#cde9e5;
+  --mark:#e0457b;--slate:#6f8db3;
+}
+[data-product="titrator"] .nav-links a:after{background:var(--accent)}
+[data-product="titrator"] .nav-links a:hover,
+[data-product="titrator"] .nav-links a.active{color:var(--accent-d)}
+[data-product="titrator"] .version{background:var(--accent-pale2);border-color:var(--accent-line)}
+[data-product="titrator"] .hero{background:
+  radial-gradient(650px 260px at 5% 20%,rgba(150,228,216,.72),transparent 70%),
+  linear-gradient(180deg,#d8f3ef 0%,#e6f8f5 57%,#eefaf8 100%)}
+[data-product="titrator"] .hero p{color:#2f5a63}
+[data-product="titrator"] .product-bar + main > .hero .hero-grid{padding-top:86px;padding-bottom:44px}
+[data-product="titrator"] .primary{background:var(--accent);box-shadow:0 10px 22px rgba(10,156,143,.2)}
+[data-product="titrator"] .primary:hover{background:var(--accent-d);box-shadow:0 14px 26px rgba(10,156,143,.28)}
+[data-product="titrator"] .outline{color:var(--accent-d);border-color:#7ccdc3}
+[data-product="titrator"] .outline:hover{border-color:var(--accent)}
+[data-product="titrator"] .section.light{background:var(--accent-pale2);border-color:var(--accent-line)}
+[data-product="titrator"] .card{border-color:var(--accent-line)}
+[data-product="titrator"] .badge{background:var(--accent-pale);color:var(--accent-d)}
+[data-product="titrator"] .release{background:#f0faf8;border-top-color:#dcf0ed}
+[data-product="titrator"] .release-card{border-color:#cbe6e2}
+[data-product="titrator"] .release-version{background:linear-gradient(90deg,#e4f6f3,#f2fbfa);border-right-color:var(--accent-line)}
+[data-product="titrator"] .auto{background:#e0f4f1;border-color:#c6e7e2}
+[data-product="titrator"] .info{background:var(--accent)}
+[data-product="titrator"] .auto h4{color:var(--accent-d)}
+[data-product="titrator"] .auto p{color:#3b6470}
+[data-product="titrator"] .download-card,
+[data-product="titrator"] .previous .release-row,
+[data-product="titrator"] .note,
+[data-product="titrator"] .faq-item{border-color:var(--accent-line)}
+[data-product="titrator"] .spec{background:var(--accent-pale2);border-color:var(--accent-line)}
+[data-product="titrator"] .note.open button{color:var(--accent-d)}
+[data-product="titrator"] .footer-links a:hover{color:var(--accent-d)}
+[data-product="titrator"] :focus-visible{outline-color:var(--accent)}
+
+/* ---------------------------------------------------------------------
+   3. Titrator components
+   --------------------------------------------------------------------- */
+
+/* live titration demo (hero) */
+.tw{position:relative;margin:0;background:#fff;border:1px solid #c9e5e0;border-radius:12px;overflow:hidden;
+  box-shadow:0 22px 40px rgba(8,80,72,.16),0 2px 6px rgba(8,80,72,.08)}
+.tw.reveal{transform:translateX(24px);animation-name:slidein;animation-delay:.12s}
+.tw-top{display:flex;align-items:center;gap:12px;height:42px;padding:0 16px;background:linear-gradient(#f8fdfc,#eef8f6);border-bottom:1px solid #d7ebe7;font-size:13px;color:#28506a}
+.tw-top b{font-weight:700;color:#0e2b4d}
+.tw-tag{margin-left:auto;font-size:12px;font-weight:500;color:#2f6660;background:#e0f4f1;padding:4px 11px;border-radius:20px}
+.tw-body{display:grid;grid-template-columns:176px minmax(0,1fr)}
+.tw-side{padding:18px 16px 16px;border-right:1px solid #dfeeeb;background:#fbfefd;display:flex;flex-direction:column;gap:15px}
+.tw-side dl{margin:0;display:flex;flex-direction:column;gap:15px}
+.tw-side dt{font-size:12px;color:#557a76;margin:0 0 3px}
+.tw-side dd{margin:0;font:700 27px/1.1 "JetBrains Mono",ui-monospace,Consolas,monospace;letter-spacing:-1.2px;color:#0e2b4d;font-variant-numeric:tabular-nums}
+.tw-side dd small{font-size:12.5px;font-weight:500;letter-spacing:0;color:#557a76}
+.tw-status{display:flex;align-items:center;gap:7px;font:600 13.5px/1.2 Inter,sans-serif!important;letter-spacing:0!important;color:#28506a!important}
+.tw-status:before{content:"";width:8px;height:8px;border-radius:50%;background:#e8a23a;flex:none}
+.tw.is-done .tw-status:before{background:var(--mark)}
+.tw-res{gap:13px!important;padding-top:15px;border-top:1px solid #dfeeeb;opacity:0;transform:translateY(6px);transition:opacity .5s ease,transform .5s ease}
+.tw.is-done .tw-res{opacity:1;transform:none}
+.tw-res dd{font-size:21px}
+.tw-chart{display:block;width:100%;height:auto}
+.tw-chart text{font:500 10.5px "JetBrains Mono",ui-monospace,Consolas,monospace;fill:#6b8a94}
+.tw-chart .grid{stroke:#e3f0ee;stroke-width:1}
+.tw-chart .axis{stroke:#b5d3ce;stroke-width:1}
+.tw-chart .curve{fill:none;stroke:var(--accent);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.tw-chart .rate{fill:none;stroke:var(--slate);stroke-width:1.4;stroke-dasharray:3 3;stroke-linejoin:round}
+.tw-chart .dot{fill:#fff;stroke:var(--accent);stroke-width:1.6}
+.tw-chart .end-mark{fill:var(--mark);opacity:0;transition:opacity .45s ease}
+.tw-chart .end-dot{fill:var(--mark);opacity:0;transition:opacity .3s ease}
+.tw-chart .end-ring{fill:none;stroke:var(--mark);stroke-width:1.5;opacity:0}
+.tw-chart .end-tag rect{fill:var(--mark)}
+.tw-chart .end-tag text{fill:#fff;font:600 11.5px Inter,Arial,sans-serif}
+.tw-chart .end-tag{opacity:0;transition:opacity .45s ease .12s}
+.tw.is-done .end-mark,.tw.is-done .end-dot,.tw.is-done .end-tag{opacity:1}
+.tw.is-done .end-ring{animation:tw-ring 1.3s ease-out 1}
+@keyframes tw-ring{0%{opacity:.85;r:4}100%{opacity:0;r:20}}
+.tw-key{display:flex;gap:16px;padding:0 16px 12px;font-size:12px;color:#557a76}
+.tw-key span{display:inline-flex;align-items:center;gap:7px}
+.tw-key i{display:inline-block;width:18px;height:0;border-top:2.6px solid var(--accent);border-radius:2px}
+.tw-key i.r{border-top:1.6px dashed var(--slate)}
+.tw-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 16px;border-top:1px solid #dfeeeb;background:#fbfefd;font-size:12.5px;color:#3d626b}
+.tw-foot b{color:#0e2b4d;font-weight:600}
+.tw-replay{flex:none;height:32px;padding:0 14px;border-radius:16px;border:1px solid #7ccdc3;background:#fff;color:var(--accent-d);font:600 12.5px Inter,sans-serif;cursor:pointer;transition:background .15s,border-color .15s}
+.tw-replay:hover:not(:disabled){background:var(--accent-pale);border-color:var(--accent)}
+.tw-replay:disabled{opacity:.45;cursor:default}
+.tw-replay:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* the four steps of a run */
+.steps{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.step{position:relative;padding:0 30px 0 0}
+.step-n{position:relative;z-index:1;width:36px;height:36px;border-radius:50%;background:#fff;border:2px solid var(--accent);color:var(--accent-d);display:grid;place-items:center;font:800 14px Manrope,Inter,sans-serif;margin-bottom:16px}
+.step:not(:last-child):before{content:"";position:absolute;left:46px;right:12px;top:17px;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent-soft));border-radius:2px}
+.step h3{font-family:Manrope,Inter,sans-serif;font-size:16px;font-weight:800;margin:0 0 7px}
+.step p{margin:0;max-width:250px;font-size:14px;line-height:1.6;color:#426587}
+
+@media(max-width:1100px){
+  .steps{grid-template-columns:1fr 1fr;row-gap:30px}
+  .step:nth-child(2):before{display:none}
+  .tw{max-width:780px}
+}
+@media(max-width:700px){
+  .tw-body{grid-template-columns:1fr}
+  .tw-side{border-right:0;border-bottom:1px solid #dfeeeb;gap:14px}
+  .tw-side dl{flex-direction:row;flex-wrap:wrap;gap:14px 24px}
+  .tw-side dd{font-size:23px}
+  .tw-res{gap:24px!important;border-top:0;padding-top:0;opacity:1;transform:none}
+  .tw-res dd{font-size:19px!important}
+  .steps{grid-template-columns:1fr}
+  .step:before{display:none!important}
+  .tw-foot{flex-direction:column;align-items:flex-start}
+}
+@media(prefers-reduced-motion:reduce){
+  .tw-chart .end-mark,.tw-chart .end-dot,.tw-chart .end-tag,.tw-res{transition:none!important}
+}

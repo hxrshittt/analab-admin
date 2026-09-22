@@ -131,8 +131,10 @@
           '<span class="chip">' + fmtSize(live.file.size) + '</span>' +
           '<span class="chip"><span class="mono" title="' + esc(live.file.sha256) + '">SHA-256 ' + esc(shortHash(live.file.sha256)) + '</span>' +
           '<button type="button" data-copy="' + esc(live.file.sha256) + '" title="Copy full checksum" aria-label="Copy full checksum">' + I.copy + '</button></span>'
-        : '<span class="chip warn">' + I.alert + '<span>No installer uploaded. Visitors can’t download this version yet.</span></span>' +
-          '<a class="btn btn-light btn-sm" href="#/edit/' + live.id + '">Upload installer</a>';
+        : (live.version === '0.0.0'
+          ? '<span class="chip">' + I.alert + '<span>Default placeholder. Publish your first real release to replace it.</span></span>'
+          : '<span class="chip warn">' + I.alert + '<span>No installer uploaded. Visitors can’t download this version yet.</span></span>' +
+            '<a class="btn btn-light btn-sm" href="#/edit/' + live.id + '">Upload installer</a>');
       liveHtml =
         '<section class="live">' + liveCurve() +
         '<div class="live-top"><div>' +
@@ -164,13 +166,13 @@
         '<div class="c-date">' + fmtDate(r.date) + '</div>' +
         '<div class="c-file">' + (r.file
           ? '<span class="fname" title="' + esc(r.file.name) + '">' + esc(r.file.name) + '</span><small>' + fmtSize(r.file.size) + '</small>'
-          : '<span class="pill pill-warn">No installer</span>') + '</div>' +
+          : (r.placeholder ? '<small>Default placeholder</small>' : '<span class="pill pill-warn">No installer</span>')) + '</div>' +
         '<div class="c-dl">' + r.downloads + '</div>' +
-        '<div class="c-act">' +
+        '<div class="c-act">' + (r.placeholder ? '' :
         (isLive ? '' : '<button class="btn btn-outline btn-sm" type="button" data-action="live">Make live</button>') +
         (r.file ? '<a class="icon-btn" href="' + r.downloadUrl + '" title="Download installer" aria-label="Download installer for ' + esc(r.version) + '">' + I.download + '</a>' : '') +
         '<a class="icon-btn" href="#/edit/' + r.id + '" title="Edit release" aria-label="Edit ' + esc(r.version) + '">' + I.edit + '</a>' +
-        ((!isLive || only) ? '<button class="icon-btn danger" type="button" data-action="delete" title="Delete release" aria-label="Delete ' + esc(r.version) + '">' + I.trash + '</button>' : '') +
+        ((!isLive || only) ? '<button class="icon-btn danger" type="button" data-action="delete" title="Delete release" aria-label="Delete ' + esc(r.version) + '">' + I.trash + '</button>' : '')) +
         '</div></div>';
     }).join('');
 
@@ -192,6 +194,7 @@
     document.title = (editing ? 'Edit v' + editing.version : 'New release') + ' | Analab admin';
 
     var top = d.releases[0], chosen = null;
+    var locked = !!editing && d.limits.storage === 'github';
     var isLive = editing && editing.id === d.latestId;
     var m = top && /^(\d+)\.(\d+)\.(\d+)/.exec(top.version);
     var bumps = (!editing && m) ? [['Patch', m[1] + '.' + m[2] + '.' + (+m[3] + 1)], ['Minor', m[1] + '.' + (+m[2] + 1) + '.0'], ['Major', (+m[1] + 1) + '.0.0']] : [];
@@ -204,7 +207,8 @@
         '<section class="card panel"><h2>Version details</h2>' +
         '<div class="two">' +
           '<div class="field"><label for="f-version">Version number</label>' +
-          '<input class="input mono" id="f-version" placeholder="1.4.0" autocomplete="off" spellcheck="false" value="' + esc(editing ? editing.version : '') + '">' +
+          '<input class="input mono" id="f-version" placeholder="1.4.0" autocomplete="off" spellcheck="false"' + (locked ? ' readonly' : '') + ' value="' + esc(editing ? editing.version : '') + '">' +
+          (locked ? '<div class="hint">The version number can’t change after publishing. To change it, delete this release and publish again.</div>' : '') +
           (bumps.length ? '<div class="bumps" aria-label="Suggested versions">' + bumps.map(function (b) { return '<button class="bump" type="button" data-v="' + b[1] + '"><small>' + b[0] + '</small>' + b[1] + '</button>'; }).join('') + '</div>' : '') +
           '</div>' +
           '<div class="field"><label for="f-date">Release date</label><input class="input" id="f-date" type="date" value="' + esc(editing ? editing.date : today()) + '"></div>' +
@@ -290,7 +294,7 @@
         prog.hidden = false;
         var pct = Math.floor(loaded / total * 100);
         $('#bar').style.width = pct + '%'; $('#p-pct').textContent = pct + '%';
-        $('#p-text').textContent = pct >= 100 ? 'Verifying checksum…' : fmtSize(loaded) + ' of ' + fmtSize(total);
+        $('#p-text').textContent = pct >= 100 ? (d.limits.storage === 'github' ? 'Sending to GitHub, this can take a minute…' : 'Verifying checksum…') : fmtSize(loaded) + ' of ' + fmtSize(total);
       };
       var req = chosen
         ? sendWithProgress(editing ? 'PUT' : 'POST', editing ? '/api/admin/releases/' + editing.id : '/api/admin/releases', fd, onProgress)
@@ -312,6 +316,15 @@
   /* ---------- Account ---------- */
   function renderAccount() {
     document.title = 'Account | Analab admin';
+    if (state.me.storage === 'github') {
+      view.innerHTML =
+        '<div class="page-head"><div><h1>Account</h1><p>Signed in as <b>' + esc(state.me.username) + '</b>.</p></div></div>' +
+        '<section class="card panel narrow"><h2>Change your login</h2>' +
+        '<p class="hint" style="font-size:14px;line-height:1.6">Your username and password are set in Render, so they stay the same when the server restarts. ' +
+        'To change them, open your service in Render, go to <b>Environment</b>, edit <span class="mono">ADMIN_USERNAME</span> or <span class="mono">ADMIN_PASSWORD</span>, and save. Render redeploys and the new login works.</p>' +
+        '<p class="hint" style="font-size:14px;line-height:1.6;margin-top:14px">Releases are stored as GitHub Releases in <b>' + esc(state.me.repo || '') + '</b>.</p></section>';
+      return;
+    }
     view.innerHTML =
       '<div class="page-head"><div><h1>Account</h1><p>Change the username or password used to sign in.</p></div></div>' +
       '<section class="card panel narrow"><form id="acct" novalidate autocomplete="off">' +

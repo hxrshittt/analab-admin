@@ -53,7 +53,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function (a) {
     if (latest.file) {
       var h = latest.file.sha256;
       each('[data-size]', function (el) { el.textContent = size(latest.file.size); });
-      each('[data-sha]', function (el) { el.textContent = h.slice(0, 4) + '...' + h.slice(-4); el.title = h; });
+      each('[data-sha]', function (el) { el.textContent = h ? h.slice(0, 4) + '...' + h.slice(-4) : '—'; el.title = h || ''; });
     } else if (latest.version !== staticVersion) {
       each('[data-size],[data-sha]', function (el) { el.textContent = '—'; });
     }
