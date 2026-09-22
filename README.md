@@ -1,8 +1,18 @@
 # Analab website + admin dashboard
 
-Your original static site, now with a private admin dashboard where you can
-sign in, change the version, and upload the installer. The public pages
-(Home, Downloads, Release Notes) update automatically from what you publish.
+Your Analab site, now with a private admin dashboard where you can sign in,
+change the version, and upload the installer. The public pages (Home, Downloads,
+Release Notes) update automatically from what you publish.
+
+The site covers **two products**, each with its own pages, its own release list and its own live version:
+
+| Product | Pages | Release API |
+|---|---|---|
+| Decay Analyzer | `/` (index, features, downloads, release-notes, support) | `/api/latest` |
+| Titrator | `/titrator/` (same five pages) | `/api/latest?product=titrator` |
+
+A glass switcher under the navigation bar moves between them (and keeps you on the same kind of page, so
+Downloads goes to Downloads).
 
 ## Run it
 
@@ -30,19 +40,24 @@ Forgot the password? Run `npm run reset-admin` (creates a new login and prints i
 
 ## Default version and update checks
 
+Add `?product=titrator` or `?product=decay-analyzer` to `/api/latest`, `/api/releases` and `/download/latest`.
+With no `product`, they answer for Decay Analyzer, so software that already calls `/api/latest` keeps working.
+
 Until you publish a release, the site and `GET /api/latest` report version **0.0.0**
 (defined as `DEFAULT_VERSION` in `server.js`). Your software can ignore 0.0.0 and only
 offer an update when the reported version is higher than the installed one
 (compare each number separately, so 1.10.0 is higher than 1.9.0).
 
-`/api/latest` returns JSON with `version`, `date`, `whatsNew`, `fixes`, `file.sha256`
+`/api/latest` returns JSON with `product`, `version`, `date`, `whatsNew`, `fixes`, `file.sha256`
 and `downloadUrl` (a path like `/download/<id>`).
 
-Already ran an older copy? Delete `data/db.json` and restart to get the 0.0.0 default again.
+Already ran an older copy (before Titrator existed)? Nothing to do: `data/db.json` is upgraded automatically and
+every existing release stays with Decay Analyzer. Delete `data/db.json` and restart to start from scratch.
 
 ## Publishing a new version
 
-1. Sign in at `/admin` and click **New release**.
+1. Sign in at `/admin`, choose **Titrator** or **Decay Analyzer** at the top of the sidebar, then click **New release**.
+   Everything you see in the dashboard (live version, list, stats) is for the product you picked.
 2. Pick a version (Patch / Minor / Major suggestions are one click), set the date,
    and write the release notes (one line per bullet).
 3. Drop the installer (.exe, .msi or .zip). You will see upload progress, and a
@@ -76,7 +91,11 @@ This needs a Node.js host. **GitHub Pages cannot run it.** See `DEPLOYMENT.md` f
 
 ```
 server.js            backend (login, releases, uploads, downloads)
-public/              the website (index, features, downloads, release-notes, support)
+public/              Decay Analyzer pages (index, features, downloads, release-notes, support)
+public/titrator/     Titrator pages (same five pages)
+public/product.css   product switcher (liquid glass) + Titrator theme
+public/product.js    switcher behaviour (drag, slide, remember position between pages)
+public/titrator.js   the live titration demo on the Titrator home page
 public/admin/        admin login page + dashboard styles/scripts
 views/dashboard.html dashboard page (only served to a signed-in admin)
 data/                created at runtime: releases, admin login

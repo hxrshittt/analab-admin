@@ -196,36 +196,55 @@ function fail(ip) {
 setInterval(() => { for (const [ip, a] of attempts) if (Date.now() - a.first > WINDOW) attempts.delete(ip); }, WINDOW).unref();
 
 // ---------------------------------------------------------------------------
+// Products
+// One website, two software products. Each product has its own list of releases and its own
+// "live" version. Old data (saved before Titrator existed) belongs to Decay Analyzer.
+// ---------------------------------------------------------------------------
+const PRODUCTS = {
+  'decay-analyzer': { name: 'Decay Analyzer', tagPrefix: '', filePrefix: 'analab-decay-analyzer', releaseName: (v) => `Analab ${v}` },
+  titrator: { name: 'Titrator', tagPrefix: 'titrator-', filePrefix: 'analab-titrator', releaseName: (v) => `Analab Titrator ${v}` },
+};
+const DEFAULT_PRODUCT = 'decay-analyzer';
+const productId = (v) => {
+  const p = String(v == null || v === '' ? DEFAULT_PRODUCT : v).trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(PRODUCTS, p) ? p : null;
+};
+const isPlaceholderId = (id) => String(id).startsWith('placeholder-');
+// Shown until the first real release of a product is published. Never stored.
+function placeholderView(product) {
+  const p = { id: 'placeholder-' + product, product, version: DEFAULT_VERSION, date: today(), whatsNew: [], fixes: [], downloads: 0, file: null, placeholder: true };
+  return { latestId: p.id, releases: [p] };
+}
+
+// ---------------------------------------------------------------------------
 // Storage: LOCAL (JSON file + installers on this server's disk)
 //
 // Every store returns releases in one shape:
-//   { id, version, date, whatsNew[], fixes[], file: {name,size,sha256,uploadedAt}|null, downloads, placeholder? }
+//   { id, product, version, date, whatsNew[], fixes[], file: {name,size,sha256,uploadedAt}|null, downloads, placeholder? }
+// and every store offers: list(product), find(id), create(product, form, file), update(id, form, file),
+// setLatest(id), remove(id), download(id).
 // ---------------------------------------------------------------------------
 function makeLocalStore() {
   const DB_FILE = path.join(DATA_DIR, 'db.json');
-
-  // Default state: one placeholder release, version 0.0.0 (no installer).
-  // Your software can treat 0.0.0 as "nothing published yet" and only update when the version goes higher.
-  function seedDb() {
-    const release = {
-      id: rid('r_'), version: DEFAULT_VERSION, date: today(),
-      whatsNew: [], fixes: [], file: null, downloads: 0, createdAt: new Date().toISOString(),
-    };
-    return { latestId: release.id, releases: [release] };
-  }
-  if (!fs.existsSync(DB_FILE)) writeJson(DB_FILE, seedDb());
-  let db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  const fresh = !fs.existsSync(DB_FILE);
+  let db = fresh ? { latest: {}, releases: [] } : JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  let dirty = fresh;
+  // upgrade a database saved before there were two products
+  if (!db.latest) { db.latest = { [DEFAULT_PRODUCT]: db.latestId || null }; delete db.latestId; dirty = true; }
+  for (const r of db.releases) if (!r.product) { r.product = DEFAULT_PRODUCT; dirty = true; }
   const saveDb = () => writeJson(DB_FILE, db);
+  if (dirty) saveDb();
+
   const filePathOf = (r) => (r.file ? path.join(UPLOAD_DIR, r.file.stored) : null);
   const norm = (r) => ({
-    id: r.id, version: r.version, date: r.date, whatsNew: r.whatsNew, fixes: r.fixes, downloads: r.downloads,
+    id: r.id, product: r.product, version: r.version, date: r.date, whatsNew: r.whatsNew, fixes: r.fixes, downloads: r.downloads,
     file: r.file ? { name: r.file.name, size: r.file.size, sha256: r.file.sha256, uploadedAt: r.file.uploadedAt } : null,
   });
-  const find = (id) => db.releases.find((r) => r.id === id);
+  const get = (id) => db.releases.find((r) => r.id === id);
 
-  async function storeFile(tmp, originalName, version) {
+  async function storeFile(tmp, originalName, version, product) {
     const ext = path.extname(originalName).toLowerCase();
-    const stored = `analab-${version.replace(/[^\w.-]/g, '_')}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+    const stored = `${PRODUCTS[product].filePrefix}-${version.replace(/[^\w.-]/g, '_')}-${crypto.randomBytes(4).toString('hex')}${ext}`;
     const sha256 = await sha256File(tmp);
     const size = fs.statSync(tmp).size;
     fs.renameSync(tmp, path.join(UPLOAD_DIR, stored));
@@ -234,46 +253,54 @@ function makeLocalStore() {
 
   return {
     kind: 'local',
-    async list() { return { latestId: db.latestId, releases: db.releases.map(norm) }; },
 
-    async create(f, file) {
-      const stored = await storeFile(file.tmp, file.originalName, f.version);
-      const release = { id: rid('r_'), version: f.version, date: f.date, whatsNew: f.whatsNew, fixes: f.fixes, file: stored, downloads: 0, createdAt: new Date().toISOString() };
+    async list(product) {
+      const releases = db.releases.filter((r) => r.product === product).map(norm);
+      if (!releases.length) return placeholderView(product);
+      const wanted = db.latest[product];
+      return { latestId: releases.some((r) => r.id === wanted) ? wanted : null, releases };
+    },
+
+    async find(id) { const r = get(id); return r ? norm(r) : null; },
+
+    async create(product, f, file) {
+      const stored = await storeFile(file.tmp, file.originalName, f.version, product);
+      const release = { id: rid('r_'), product, version: f.version, date: f.date, whatsNew: f.whatsNew, fixes: f.fixes, file: stored, downloads: 0, createdAt: new Date().toISOString() };
       db.releases.push(release);
-      if (f.makeLatest || !db.latestId) db.latestId = release.id;
+      if (f.makeLatest || !db.latest[product]) db.latest[product] = release.id;
       saveDb();
       return release.id;
     },
 
     async update(id, f, file) {
-      const release = find(id);
+      const release = get(id);
       if (!release) throw httpError(404, 'Release not found.');
       let oldFile = null;
-      if (file) { oldFile = filePathOf(release); release.file = await storeFile(file.tmp, file.originalName, f.version); }
+      if (file) { oldFile = filePathOf(release); release.file = await storeFile(file.tmp, file.originalName, f.version, release.product); }
       Object.assign(release, { version: f.version, date: f.date, whatsNew: f.whatsNew, fixes: f.fixes });
-      if (f.makeLatest) db.latestId = release.id;
+      if (f.makeLatest) db.latest[release.product] = release.id;
       saveDb();
       rm(oldFile);
     },
 
     async setLatest(id) {
-      const release = find(id);
+      const release = get(id);
       if (!release) throw httpError(404, 'Release not found.');
-      db.latestId = release.id;
+      db.latest[release.product] = release.id;
       saveDb();
     },
 
     async remove(id) {
-      const release = find(id);
+      const release = get(id);
       if (!release) throw httpError(404, 'Release not found.');
       db.releases = db.releases.filter((r) => r !== release);
-      if (db.latestId === release.id) db.latestId = null;
+      if (db.latest[release.product] === release.id) db.latest[release.product] = null;
       saveDb();
       rm(filePathOf(release));
     },
 
     async download(id) {
-      const release = find(id);
+      const release = get(id);
       const p = release && filePathOf(release);
       if (!p || !fs.existsSync(p)) return null;
       return { file: p, name: release.file.name, count: () => { release.downloads++; saveDb(); } };
@@ -284,6 +311,10 @@ function makeLocalStore() {
 // ---------------------------------------------------------------------------
 // Storage: GITHUB (each release is a GitHub Release with the installer attached)
 // The repo is the database. Reading works without any local state.
+//   Decay Analyzer releases are tagged   v1.2.3            (unchanged, so existing releases keep working)
+//   Titrator releases are tagged         titrator-v1.2.3
+// GitHub only has one "latest release" per repo, so the live version of each product is remembered with a
+// hidden marker at the end of that release's description.
 // ---------------------------------------------------------------------------
 function makeGithubStore() {
   const GH_HEADERS = {
@@ -292,8 +323,8 @@ function makeGithubStore() {
     'X-GitHub-Api-Version': '2022-11-28',
     'User-Agent': 'analab-admin',
   };
-  const PLACEHOLDER_ID = 'placeholder';
   const TTL = 30 * 1000;
+  const LIVE_MARK = '<!--analab-live-->';
   let cache = null, cacheAt = 0, inflight = null;
 
   function ghError(status, data) {
@@ -356,12 +387,13 @@ function makeGithubStore() {
   }
 
   // Notes + checksum live in a hidden comment at the end of the release description
-  function makeBody(f, sha256) {
+  function makeBody(f, sha256, live) {
     const parts = [];
     if (f.whatsNew.length) parts.push("## What's new\n" + f.whatsNew.map((x) => '- ' + x).join('\n'));
     if (f.fixes.length) parts.push('## Bug fixes\n' + f.fixes.map((x) => '- ' + x).join('\n'));
     const meta = JSON.stringify({ date: f.date, whatsNew: f.whatsNew, fixes: f.fixes, sha256: sha256 || null }).replace(/>/g, '\\u003e');
     parts.push(`<!--analab:${meta}-->`);
+    if (live) parts.push(LIVE_MARK);
     return parts.join('\n\n');
   }
   function parseMeta(body) {
@@ -369,17 +401,37 @@ function makeGithubStore() {
     if (!m) return {};
     try { return JSON.parse(m[1]); } catch { return {}; }
   }
+  // add or remove the live marker without touching the rest of the description
+  function withLive(body, on) {
+    const clean = String(body || '').split(LIVE_MARK).join('').replace(/\s+$/, '');
+    return on ? clean + '\n\n' + LIVE_MARK : clean;
+  }
+
+  // "titrator-v1.2.3" -> { product: 'titrator', version: '1.2.3' }; "v1.2.3" -> Decay Analyzer; anything else -> null
+  function parseTag(tag) {
+    const t = String(tag || '');
+    for (const [product, cfg] of Object.entries(PRODUCTS)) {
+      if (cfg.tagPrefix && t.toLowerCase().startsWith(cfg.tagPrefix)) {
+        const version = t.slice(cfg.tagPrefix.length).replace(/^v/i, '');
+        return VERSION_RE.test(version) ? { product, version } : null;
+      }
+    }
+    const version = t.replace(/^v/i, '');
+    return VERSION_RE.test(version) ? { product: DEFAULT_PRODUCT, version } : null;
+  }
+  const tagFor = (product, version) => PRODUCTS[product].tagPrefix + 'v' + version;
 
   // GitHub release -> our release shape (returns null for releases that are not version tags)
   function fromGh(r) {
-    const version = String(r.tag_name || '').replace(/^v/i, '');
-    if (!VERSION_RE.test(version)) return null;
+    const tag = parseTag(r.tag_name);
+    if (!tag) return null;
     const meta = parseMeta(r.body);
     const assets = r.assets || [];
     const asset = assets.find((a) => ALLOWED_EXT.includes(path.extname(a.name).toLowerCase())) || null;
     const bullets = (r.body || '').split(/\r?\n/).filter((l) => /^\s*[-*]\s+/.test(l)).map((l) => l.replace(/^\s*[-*]\s+/, '').trim());
     return {
-      id: String(r.id), version,
+      id: String(r.id), product: tag.product, version: tag.version,
+      live: String(r.body || '').includes(LIVE_MARK),
       date: meta.date && validDate(meta.date) ? meta.date : String(r.published_at || r.created_at || today()).slice(0, 10),
       whatsNew: Array.isArray(meta.whatsNew) ? meta.whatsNew : bullets,
       fixes: Array.isArray(meta.fixes) ? meta.fixes : [],
@@ -393,20 +445,13 @@ function makeGithubStore() {
 
   async function fetchAll() {
     const raw = await gh('GET', `/repos/${GITHUB_REPO}/releases?per_page=100`);
-    let latestRaw = null;
-    try { latestRaw = await gh('GET', `/repos/${GITHUB_REPO}/releases/latest`); }
+    let ghLatest = null;
+    try { ghLatest = await gh('GET', `/repos/${GITHUB_REPO}/releases/latest`); }
     catch (e) { if (e.ghStatus !== 404) throw e; }
-    let releases = raw.filter((r) => !r.draft).map(fromGh).filter(Boolean);
-    if (!releases.length) {
-      // nothing published yet: show the 0.0.0 default
-      return { latestId: PLACEHOLDER_ID, releases: [{ id: PLACEHOLDER_ID, version: DEFAULT_VERSION, date: today(), whatsNew: [], fixes: [], downloads: 0, file: null, placeholder: true }] };
-    }
-    let latestId = latestRaw && releases.some((r) => r.id === String(latestRaw.id)) ? String(latestRaw.id) : null;
-    if (!latestId) latestId = sortedDesc(releases)[0].id;
-    return { latestId, releases };
+    return { all: raw.filter((r) => !r.draft).map(fromGh).filter(Boolean), ghLatestId: ghLatest ? String(ghLatest.id) : null };
   }
 
-  function list() {
+  function data() {
     if (cache && Date.now() - cacheAt < TTL) return Promise.resolve(cache);
     if (inflight) return inflight;
     inflight = fetchAll()
@@ -416,37 +461,65 @@ function makeGithubStore() {
     return inflight;
   }
   const invalidate = () => { cache = null; cacheAt = 0; };
+
+  // The live version of a product: the release carrying the live marker; else GitHub's own "latest" if it is
+  // one of this product's releases (releases made by hand or before Titrator existed); else the highest version.
+  function viewOf(product, d) {
+    const releases = d.all.filter((r) => r.product === product);
+    if (!releases.length) return placeholderView(product);
+    const marked = sortedDesc(releases.filter((r) => r.live));
+    let latestId = marked.length ? marked[0].id : null;
+    if (!latestId && d.ghLatestId && releases.some((r) => r.id === d.ghLatestId)) latestId = d.ghLatestId;
+    if (!latestId) latestId = sortedDesc(releases)[0].id;
+    return { latestId, releases };
+  }
+
   const notPlaceholder = (id) => {
-    if (id === PLACEHOLDER_ID) throw httpError(400, 'This is the default 0.0.0 placeholder. Publish a real release instead.');
+    if (isPlaceholderId(id)) throw httpError(400, 'This is the default 0.0.0 placeholder. Publish a real release instead.');
   };
   async function getRelease(id) {
     try { return await gh('GET', `/repos/${GITHUB_REPO}/releases/${encodeURIComponent(id)}`); }
     catch (e) { if (e.ghStatus === 404) throw httpError(404, 'Release not found.'); throw e; }
   }
+  // only one release per product carries the live marker
+  async function clearLiveMarkers(product, exceptId) {
+    invalidate();
+    const d = await data();
+    for (const r of d.all.filter((x) => x.product === product && x.live && x.id !== exceptId)) {
+      const rel = await getRelease(r.id);
+      await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { body: withLive(rel.body, false) });
+    }
+  }
+  // GitHub's own "latest" badge is only kept in step for Decay Analyzer (Titrator never takes it)
+  const ghLatestFlag = (product, live) => (product === DEFAULT_PRODUCT && live ? 'true' : 'false');
 
   return {
     kind: 'github',
-    list,
 
-    async create(f, file) {
+    async list(product) { return viewOf(product, await data()); },
+
+    async find(id) { return (await data()).all.find((r) => r.id === String(id)) || null; },
+
+    async create(product, f, file) {
       try {
         const sha256 = await sha256File(file.tmp);
         const size = fs.statSync(file.tmp).size;
         const name = safeName(file.originalName);
-        const current = await list();
-        const first = current.releases.every((r) => r.placeholder);
+        const d = await data();
+        const live = f.makeLatest || !d.all.some((r) => r.product === product);
 
         // draft first, attach the installer, then publish: visitors never see a release without its file
         const rel = await gh('POST', `/repos/${GITHUB_REPO}/releases`, {
-          tag_name: 'v' + f.version, name: 'Analab ' + f.version, body: makeBody(f, sha256), draft: true,
+          tag_name: tagFor(product, f.version), name: PRODUCTS[product].releaseName(f.version), body: makeBody(f, sha256, live), draft: true,
         });
         try {
           await uploadAsset(rel.upload_url, file.tmp, name, size);
-          await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { draft: false, make_latest: (f.makeLatest || first) ? 'true' : 'false' });
+          await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { draft: false, make_latest: ghLatestFlag(product, live) });
         } catch (e) {
           await gh('DELETE', `/repos/${GITHUB_REPO}/releases/${rel.id}`).catch(() => {});
           throw e;
         }
+        if (live) await clearLiveMarkers(product, String(rel.id));
         invalidate();
         return String(rel.id);
       } finally { rm(file.tmp); }
@@ -457,7 +530,8 @@ function makeGithubStore() {
       try {
         const rel = await getRelease(id);
         const cur = fromGh(rel);
-        let sha256 = cur && cur.file ? cur.file.sha256 : null;
+        if (!cur) throw httpError(404, 'Release not found.');
+        let sha256 = cur.file ? cur.file.sha256 : null;
         if (file) {
           sha256 = await sha256File(file.tmp);
           const size = fs.statSync(file.tmp).size;
@@ -466,15 +540,22 @@ function makeGithubStore() {
           }
           await uploadAsset(rel.upload_url, file.tmp, safeName(file.originalName), size);
         }
-        await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { body: makeBody(f, sha256), ...(f.makeLatest ? { make_latest: 'true' } : {}) });
+        const live = f.makeLatest || cur.live;
+        await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, {
+          body: makeBody(f, sha256, live), ...(f.makeLatest ? { make_latest: ghLatestFlag(cur.product, true) } : {}),
+        });
+        if (f.makeLatest) await clearLiveMarkers(cur.product, String(rel.id));
         invalidate();
       } finally { if (file) rm(file.tmp); }
     },
 
     async setLatest(id) {
       notPlaceholder(id);
-      await getRelease(id);
-      await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${encodeURIComponent(id)}`, { make_latest: 'true' });
+      const rel = await getRelease(id);
+      const cur = fromGh(rel);
+      if (!cur) throw httpError(404, 'Release not found.');
+      await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { body: withLive(rel.body, true), make_latest: ghLatestFlag(cur.product, true) });
+      await clearLiveMarkers(cur.product, String(rel.id));
       invalidate();
     },
 
@@ -487,8 +568,7 @@ function makeGithubStore() {
     },
 
     async download(id) {
-      const { releases } = await list();
-      const r = releases.find((x) => x.id === id);
+      const r = (await data()).all.find((x) => x.id === String(id));
       return r && r.file && r.file.url ? { redirect: r.file.url } : null;
     },
   };
@@ -501,7 +581,7 @@ const store = USE_GITHUB ? makeGithubStore() : makeLocalStore();
 // ---------------------------------------------------------------------------
 function publicRelease(r, latestId) {
   return {
-    id: r.id, version: r.version, date: r.date, whatsNew: r.whatsNew, fixes: r.fixes,
+    id: r.id, product: r.product, version: r.version, date: r.date, whatsNew: r.whatsNew, fixes: r.fixes,
     isLatest: r.id === latestId, platform: 'Windows', arch: '64-bit',
     file: r.file ? { name: r.file.name, size: r.file.size, sha256: r.file.sha256 || null } : null,
     downloadUrl: r.file ? `/download/${r.id}` : null,
@@ -521,6 +601,12 @@ function readForm(req, releases, existingId) {
   const date = String(b.date || today()).trim();
   if (!validDate(date)) return { error: 'Enter a valid release date.' };
   return { version, date, whatsNew: parseLines(b.whatsNew), fixes: parseLines(b.fixes), makeLatest: b.makeLatest !== 'false' };
+}
+
+function queryProduct(req) {
+  const product = productId(req.query.product);
+  if (!product) throw httpError(400, 'Unknown product. Use decay-analyzer or titrator.');
+  return product;
 }
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -549,13 +635,13 @@ app.use(express.json({ limit: '20kb' }));
 
 // ---- Public API -----------------------------------------------------------
 app.get('/api/latest', wrap(async (req, res) => {
-  const { latestId, releases } = await store.list();
+  const { latestId, releases } = await store.list(queryProduct(req));
   const r = releases.find((x) => x.id === latestId);
   if (!r) return res.status(404).json({ error: 'No release published yet.' });
   res.json(publicRelease(r, latestId));
 }));
 app.get('/api/releases', wrap(async (req, res) => {
-  const { latestId, releases } = await store.list();
+  const { latestId, releases } = await store.list(queryProduct(req));
   res.json({ latestId, releases: sortedDesc(releases).map((r) => publicRelease(r, latestId)) });
 }));
 
@@ -568,7 +654,7 @@ async function sendInstaller(req, res, id) {
   if (!readSession(req) && (!range || /^bytes=0-/.test(range))) d.count();
   res.download(d.file, d.name);
 }
-app.get('/download/latest', wrap(async (req, res) => sendInstaller(req, res, (await store.list()).latestId)));
+app.get('/download/latest', wrap(async (req, res) => sendInstaller(req, res, (await store.list(queryProduct(req))).latestId)));
 app.get('/download/:id', wrap((req, res) => sendInstaller(req, res, req.params.id)));
 
 // ---- Admin auth -----------------------------------------------------------
@@ -634,9 +720,11 @@ const uploadInstaller = (req, res, next) => upload.single('installer')(req, res,
 const fileOf = (req) => (req.file ? { tmp: req.file.path, originalName: req.file.originalname } : null);
 
 app.get('/api/admin/releases', requireAuth, wrap(async (req, res) => {
-  const { latestId, releases } = await store.list();
+  const product = queryProduct(req);
+  const { latestId, releases } = await store.list(product);
   const real = releases.filter((r) => !r.placeholder);
   res.json({
+    product, productName: PRODUCTS[product].name,
     latestId,
     releases: sortedDesc(releases).map((r) => adminRelease(r, latestId)),
     stats: {
@@ -651,12 +739,15 @@ app.get('/api/admin/releases', requireAuth, wrap(async (req, res) => {
 app.post('/api/admin/releases', requireAuth, uploadInstaller, async (req, res, next) => {
   const file = fileOf(req);
   try {
-    const { releases } = await store.list();
+    const given = (req.body || {}).product;
+    const product = given ? productId(given) : null; // must be chosen explicitly, never guessed
+    if (!product) { rm(file && file.tmp); return res.status(400).json({ error: 'Choose which product this release is for.' }); }
+    const { releases } = await store.list(product);
     const f = readForm(req, releases);
     if (f.error) { rm(file && file.tmp); return res.status(400).json({ error: f.error }); }
     if (!file) return res.status(400).json({ error: 'Choose the installer file to upload.' });
-    const id = await store.create(f, file);
-    const data = await store.list();
+    const id = await store.create(product, f, file);
+    const data = await store.list(product);
     res.status(201).json(adminRelease(data.releases.find((r) => r.id === id) || {}, data.latestId));
   } catch (e) { rm(file && file.tmp); next(e); }
 });
@@ -664,9 +755,9 @@ app.post('/api/admin/releases', requireAuth, uploadInstaller, async (req, res, n
 app.put('/api/admin/releases/:id', requireAuth, uploadInstaller, async (req, res, next) => {
   const file = fileOf(req);
   try {
-    const { releases } = await store.list();
-    const existing = releases.find((r) => r.id === req.params.id);
+    const existing = await store.find(req.params.id);
     if (!existing) { rm(file && file.tmp); return res.status(404).json({ error: 'Release not found.' }); }
+    const { releases } = await store.list(existing.product);
     const f = readForm(req, releases, existing.id);
     if (f.error) { rm(file && file.tmp); return res.status(400).json({ error: f.error }); }
     if (store.kind === 'github' && f.version !== existing.version) {
@@ -674,7 +765,7 @@ app.put('/api/admin/releases/:id', requireAuth, uploadInstaller, async (req, res
       return res.status(400).json({ error: 'The version number can’t be changed after publishing. Delete this release and publish it again with the new number.' });
     }
     await store.update(existing.id, f, file);
-    const data = await store.list();
+    const data = await store.list(existing.product);
     res.json(adminRelease(data.releases.find((r) => r.id === existing.id) || {}, data.latestId));
   } catch (e) { rm(file && file.tmp); next(e); }
 });
@@ -685,9 +776,9 @@ app.post('/api/admin/releases/:id/latest', requireAuth, wrap(async (req, res) =>
 }));
 
 app.delete('/api/admin/releases/:id', requireAuth, wrap(async (req, res) => {
-  const { latestId, releases } = await store.list();
-  const release = releases.find((r) => r.id === req.params.id);
+  const release = await store.find(req.params.id);
   if (!release) return res.status(404).json({ error: 'Release not found.' });
+  const { latestId, releases } = await store.list(release.product);
   if (release.id === latestId && releases.length > 1) {
     return res.status(400).json({ error: 'This is the live version. Make another release live before deleting it.' });
   }
@@ -735,7 +826,8 @@ app.listen(PORT, () => {
     console.log('  Set ADMIN_PASSWORD in Render, under Environment.\n');
   }
   if (USE_GITHUB) {
-    store.list().then((d) => console.log(`  GitHub connected. ${d.releases.filter((r) => !r.placeholder).length} release(s) found.\n`))
+    Promise.all(Object.keys(PRODUCTS).map((p) => store.list(p).then((d) => `${PRODUCTS[p].name}: ${d.releases.filter((r) => !r.placeholder).length}`)))
+      .then((n) => console.log(`  GitHub connected. Releases found - ${n.join(', ')}.\n`))
       .catch((e) => console.error(`  GitHub check failed: ${e.message}\n`));
   }
 });

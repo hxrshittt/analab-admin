@@ -3,7 +3,14 @@
 
   var $ = function (s, el) { return (el || document).querySelector(s); };
   var view = $('#view');
-  var state = { data: null, me: null };
+  var PRODUCTS = {
+    'decay-analyzer': { name: 'Decay Analyzer', page: '/downloads.html' },
+    titrator: { name: 'Titrator', page: '/titrator/downloads.html' }
+  };
+  var saved = null;
+  try { saved = localStorage.getItem('analab-admin-product'); } catch (e) { /* storage blocked */ }
+  var state = { data: null, me: null, product: PRODUCTS[saved] ? saved : 'decay-analyzer' };
+  var pname = function () { return PRODUCTS[state.product].name; };
 
   /* ---------- Icons ---------- */
   var svg = function (body, extra) {
@@ -105,7 +112,24 @@
   }
 
   function load() {
-    return api('GET', '/api/admin/releases').then(function (d) { state.data = d; });
+    return api('GET', '/api/admin/releases?product=' + encodeURIComponent(state.product)).then(function (d) { state.data = d; });
+  }
+  function paintProduct() {
+    var pick = $('.product-pick');
+    pick.setAttribute('data-active', state.product);
+    document.querySelectorAll('.product-pick button').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.product === state.product ? 'true' : 'false');
+    });
+  }
+  function setProduct(id) {
+    var pick = $('.product-pick'), changed = id !== state.product;
+    state.product = id;
+    try { localStorage.setItem('analab-admin-product', id); } catch (e) { /* storage blocked */ }
+    paintProduct();
+    if (changed && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      pick.classList.add('pulse');
+      setTimeout(function () { pick.classList.remove('pulse'); }, 260);
+    }
   }
 
   /* ---------- Decorative curve for the live card ---------- */
@@ -122,7 +146,7 @@
   /* ---------- Releases view ---------- */
   function renderReleases() {
     var d = state.data, live = d.releases.find(function (r) { return r.id === d.latestId; });
-    document.title = 'Releases | Analab admin';
+    document.title = 'Releases · ' + pname() + ' | Analab admin';
 
     var liveHtml;
     if (live) {
@@ -138,12 +162,12 @@
       liveHtml =
         '<section class="live">' + liveCurve() +
         '<div class="live-top"><div>' +
-        '<div class="live-tag"><span class="dot"></span>Live on your website</div>' +
+        '<div class="live-tag"><span class="dot"></span>Live on your website (' + esc(pname()) + ')</div>' +
         '<div class="live-ver">v' + esc(live.version) + '</div>' +
         '<div class="live-meta">Released ' + fmtDate(live.date) + '</div>' +
         '<div class="live-file">' + fileBits + '</div></div>' +
         '<div class="live-actions"><a class="btn btn-light" href="#/new">' + I.plus + 'Publish new version</a>' +
-        '<a class="btn btn-ghost" href="/downloads.html" target="_blank" rel="noopener">' + I.ext + 'Open downloads page</a></div></div>' +
+        '<a class="btn btn-ghost" href="' + PRODUCTS[state.product].page + '" target="_blank" rel="noopener">' + I.ext + 'Open downloads page</a></div></div>' +
         '<div class="live-stats">' +
         '<div class="stat"><b>' + live.downloads + '</b><span>Downloads of v' + esc(live.version) + '</span></div>' +
         '<div class="stat"><b>' + d.stats.downloads + '</b><span>Downloads, all versions</span></div>' +
@@ -177,7 +201,7 @@
     }).join('');
 
     view.innerHTML =
-      '<div class="page-head"><div><h1>Releases</h1><p>What visitors see on your website, and every version you have published.</p></div>' +
+      '<div class="page-head"><div><h1>' + esc(pname()) + ' releases</h1><p>What visitors see on the ' + esc(pname()) + ' pages of your website, and every version you have published.</p></div>' +
       '<a class="btn btn-primary" href="#/new">' + I.plus + 'New release</a></div>' +
       liveHtml +
       '<section class="card"><div class="card-head"><h2>All releases</h2><span>' + d.releases.length + ' total</span></div>' +
@@ -191,7 +215,7 @@
   function renderForm(id) {
     var d = state.data, editing = id ? d.releases.find(function (r) { return r.id === id; }) : null;
     if (id && !editing) { toast('That release no longer exists.', 'err'); location.hash = '#/releases'; return; }
-    document.title = (editing ? 'Edit v' + editing.version : 'New release') + ' | Analab admin';
+    document.title = (editing ? 'Edit v' + editing.version : 'New release') + ' · ' + pname() + ' | Analab admin';
 
     var top = d.releases[0], chosen = null;
     var locked = !!editing && d.limits.storage === 'github';
@@ -200,8 +224,8 @@
     var bumps = (!editing && m) ? [['Patch', m[1] + '.' + m[2] + '.' + (+m[3] + 1)], ['Minor', m[1] + '.' + (+m[2] + 1) + '.0'], ['Major', (+m[1] + 1) + '.0.0']] : [];
 
     view.innerHTML =
-      '<div class="page-head"><div><h1>' + (editing ? 'Edit v' + esc(editing.version) : 'New release') + '</h1>' +
-      '<p>' + (editing ? 'Change the details or replace the installer.' : 'Set the version, add release notes and upload the installer.') + '</p></div></div>' +
+      '<div class="page-head"><div><h1>' + (editing ? 'Edit v' + esc(editing.version) : 'New ' + esc(pname()) + ' release') + '</h1>' +
+      '<p>' + (editing ? 'Change the details or replace the installer.' : 'Publishing to the ' + esc(pname()) + ' pages. Set the version, add release notes and upload the installer.') + '</p></div></div>' +
       '<form id="rel-form" class="form-grid" novalidate>' +
       '<div>' +
         '<section class="card panel"><h2>Version details</h2>' +
@@ -282,6 +306,7 @@
       if (!editing && !chosen) { showErr('Choose the installer file to upload.'); return; }
 
       var fd = new FormData();
+      fd.append('product', state.product);
       fd.append('version', version); fd.append('date', f.date.value);
       fd.append('whatsNew', f.n.value); fd.append('fixes', f.x.value);
       fd.append('makeLatest', f.live.checked ? 'true' : 'false');
@@ -407,6 +432,17 @@
     if (name === 'account') return renderAccount();
     view.innerHTML = '<div class="loading">Loading…</div>';
     return load().then(function () {
+      if (name === 'edit' && !state.data.releases.some(function (r) { return r.id === arg; })) {
+        // the release may belong to the other product (bookmark, refresh): look there before giving up
+        var other = state.product === 'titrator' ? 'decay-analyzer' : 'titrator';
+        var keep = state.product;
+        state.product = other;
+        return load().then(function () {
+          if (state.data.releases.some(function (r) { return r.id === arg; })) { setProduct(other); return; }
+          state.product = keep; return load();
+        });
+      }
+    }).then(function () {
       if (name === 'new') return renderForm();
       if (name === 'edit') return renderForm(arg);
       renderReleases();
@@ -416,7 +452,16 @@
   $('#signout').addEventListener('click', function () {
     api('POST', '/api/admin/logout').then(function () { location.href = '/admin/login'; });
   });
+  document.querySelector('.product-pick').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-product]');
+    if (!b || b.dataset.product === state.product) return;
+    setProduct(b.dataset.product);
+    var name = (location.hash.replace(/^#\/?/, '') || 'releases').split('/')[0];
+    if (name === 'edit') location.hash = '#/releases'; // that release belongs to the other product
+    else route();
+  });
   window.addEventListener('hashchange', route);
 
+  paintProduct();
   api('GET', '/api/admin/me').then(function (me) { state.me = me; paintMe(); route(); });
 })();

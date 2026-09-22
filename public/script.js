@@ -18,6 +18,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function (a) {
 });
 
 // Live release data from the Analab server (managed in /admin).
+// Each page belongs to one product (<body data-product="titrator"> or "decay-analyzer") and only shows that product's releases.
 // If the API is unreachable (e.g. static hosting), the pages keep their built-in content.
 (function () {
   function esc(s) {
@@ -40,9 +41,14 @@ document.querySelectorAll('a[href^="#"]').forEach(function (a) {
   function each(sel, fn) { document.querySelectorAll(sel).forEach(fn); }
   function list(items) { return items.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join(''); }
 
+  var PRODUCT = document.body.getAttribute('data-product') || 'decay-analyzer';
+  var PRODUCT_NAME = document.body.getAttribute('data-product-name') || '';
+
   function apply(data) {
     var latest = data.releases.filter(function (r) { return r.isLatest; })[0];
     if (!latest) return;
+    // 0.0.0 means "nothing published yet": hide release dates that would be made up
+    document.body.classList.toggle('no-release', latest.version === '0.0.0' && !latest.file);
     var firstV = document.querySelector('[data-v]');
     var staticVersion = firstV ? firstV.textContent.trim() : '';
 
@@ -84,14 +90,14 @@ document.querySelectorAll('a[href^="#"]').forEach(function (a) {
         var body = (r.whatsNew.length ? '<b>What\'s New</b><ul>' + list(r.whatsNew) + '</ul>' : '') +
                    (r.fixes.length ? '<b>Bug Fixes</b><ul>' + list(r.fixes) + '</ul>' : '');
         return '<div class="note' + (r.isLatest ? ' open' : '') + ' reveal' + (i > 0 && i < 5 ? ' delay' + i : '') + '">' +
-          '<button>Analab v' + esc(r.version) + ' — ' + esc(fmt(r.date, 'long')) + ' <span>' + (r.isLatest ? '−' : '+') + '</span></button>' +
+          '<button>Analab ' + (PRODUCT_NAME ? esc(PRODUCT_NAME) + ' ' : '') + 'v' + esc(r.version) + ' — ' + esc(fmt(r.date, 'long')) + ' <span>' + (r.isLatest ? '−' : '+') + '</span></button>' +
           '<div class="body">' + (body || 'No notes for this release.') + '</div></div>';
       }).join('');
     });
   }
 
   if (!window.fetch) return;
-  fetch('/api/releases', { headers: { Accept: 'application/json' } })
+  fetch('/api/releases?product=' + encodeURIComponent(PRODUCT), { headers: { Accept: 'application/json' } })
     .then(function (r) { return r.ok && /json/.test(r.headers.get('content-type') || '') ? r.json() : Promise.reject(); })
     .then(apply)
     .catch(function () { /* keep static content */ });

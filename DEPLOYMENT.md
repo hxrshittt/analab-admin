@@ -48,7 +48,10 @@ Notes:
 - The very first visit after the service slept takes about a minute to load. That is Render's free plan.
 - To change your admin login, edit `ADMIN_USERNAME` / `ADMIN_PASSWORD` in Render and save.
 - The version number can't be edited after publishing (delete the release and publish again).
-- You can also create a release by hand on GitHub (tag like `v1.2.0`, attach the installer). The site picks it up within about 30 seconds.
+- You can also create a release by hand on GitHub and attach the installer. The tag decides the product:
+  `v1.2.0` is **Decay Analyzer**, `titrator-v1.2.0` is **Titrator**. The site picks it up within about 30 seconds.
+- Both products share the one repo. The live version of each product is remembered with a hidden marker at the
+  end of that release's description on GitHub, so please leave that last line alone if you edit a description.
 - If a very large upload through Render times out, publish it by hand on GitHub as above.
 
 ---
