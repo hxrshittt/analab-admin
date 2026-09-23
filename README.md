@@ -38,6 +38,10 @@ there is only this one admin login.
 
 Forgot the password? Run `npm run reset-admin` (creates a new login and prints it).
 
+## Reliability: replacing an installer never loses the old one
+
+When you upload a new installer on top of an already-published release, the server uploads the new file to GitHub FIRST and only removes the old one after that succeeds. If an upload fails partway (a network drop, a large file timing out, a GitHub hiccup), the release keeps the working installer it had before - nothing is ever left empty. Just try the upload again.
+
 ## Default version and update checks
 
 Add `?product=titrator` or `?product=decay-analyzer` to `/api/latest`, `/api/releases` and `/download/latest`.

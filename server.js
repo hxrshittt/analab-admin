@@ -514,11 +514,16 @@ function makeGithubStore() {
         });
         try {
           await uploadAsset(rel.upload_url, file.tmp, name, size);
-          await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { draft: false, make_latest: ghLatestFlag(product, live) });
         } catch (e) {
+          // The installer never made it to GitHub - nothing to keep, remove the empty draft.
           await gh('DELETE', `/repos/${GITHUB_REPO}/releases/${rel.id}`).catch(() => {});
           throw e;
         }
+        // The installer is safely on GitHub now. If publishing fails here (rare), do NOT delete
+        // the release - that would throw away the file that just finished uploading. Leave it as
+        // a draft; it's visible (and can be published by hand) on GitHub's own Releases page.
+        await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, { draft: false, make_latest: ghLatestFlag(product, live) })
+          .catch((e) => { throw httpError(e.ghStatus === 0 ? 502 : (e.status || 502), `The installer uploaded, but publishing the release failed (${e.message}). Check GitHub's Releases page - the file may already be there as a draft.`); });
         if (live) await clearLiveMarkers(product, String(rel.id));
         invalidate();
         return String(rel.id);
@@ -535,10 +540,21 @@ function makeGithubStore() {
         if (file) {
           sha256 = await sha256File(file.tmp);
           const size = fs.statSync(file.tmp).size;
-          for (const a of rel.assets || []) {
-            if (ALLOWED_EXT.includes(path.extname(a.name).toLowerCase())) await gh('DELETE', `/repos/${GITHUB_REPO}/releases/assets/${a.id}`);
+          const oldAssets = (rel.assets || []).filter((a) => ALLOWED_EXT.includes(path.extname(a.name).toLowerCase()));
+          const wantName = safeName(file.originalName);
+          // GitHub won't allow two assets with the same name in one release, so if the new file
+          // is named the same as the one it's replacing, upload it under a temporary name first.
+          const clash = oldAssets.some((a) => a.name === wantName);
+          const uploadName = clash ? `new-${crypto.randomBytes(3).toString('hex')}-${wantName}` : wantName;
+          // Upload the new installer BEFORE touching the old one. If this upload fails (network
+          // drop, timeout on a large file, a GitHub hiccup), the old installer is untouched and
+          // nothing is lost - the release keeps working exactly as it did before this request.
+          const newAsset = await uploadAsset(rel.upload_url, file.tmp, uploadName, size);
+          // The new file is safely on GitHub now. Only remove the old one(s).
+          for (const a of oldAssets) await gh('DELETE', `/repos/${GITHUB_REPO}/releases/assets/${a.id}`).catch(() => {});
+          if (uploadName !== wantName) {
+            await gh('PATCH', `/repos/${GITHUB_REPO}/releases/assets/${newAsset.id}`, { name: wantName }).catch(() => {});
           }
-          await uploadAsset(rel.upload_url, file.tmp, safeName(file.originalName), size);
         }
         const live = f.makeLatest || cur.live;
         await gh('PATCH', `/repos/${GITHUB_REPO}/releases/${rel.id}`, {
