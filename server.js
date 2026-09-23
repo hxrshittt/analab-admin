@@ -656,6 +656,17 @@ app.use((req, res, next) => {
 app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 app.use(express.json({ limit: '20kb' }));
 
+// TEMPORARY DIAGNOSTIC LOGGING - remove once the "data disappears" issue is found.
+// Logs every request that could change something, with the caller's User-Agent, so we can see
+// exactly what a client is doing when data goes missing.
+app.use((req, res, next) => {
+  const risky = req.method !== 'GET' && req.method !== 'HEAD';
+  if (risky || req.path.startsWith('/api/admin') || req.path.startsWith('/download')) {
+    console.log(`[diag] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ua="${req.get('user-agent') || ''}" ip=${req.ip}`);
+  }
+  next();
+});
+
 // ---- Public API -----------------------------------------------------------
 app.get('/api/latest', wrap(async (req, res) => {
   const { latestId, releases } = await store.list(queryProduct(req));
