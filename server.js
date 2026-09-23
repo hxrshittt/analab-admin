@@ -604,7 +604,14 @@ function readForm(req, releases, existingId) {
 }
 
 function queryProduct(req) {
-  const product = productId(req.query.product);
+  let requested = req.query.product;
+  // AutoTitrator 1.3.0 - 1.3.2 ask for /api/latest without ?product=titrator. Without this they would be
+  // offered Decay Analyzer releases (and forced to install them). Every titrator build identifies itself
+  // with the User-Agent "AutoTitrator/<version>", so answer those copies for Titrator.
+  if ((requested == null || requested === '') && /^AutoTitrator\//i.test(String(req.get('user-agent') || ''))) {
+    requested = 'titrator';
+  }
+  const product = productId(requested);
   if (!product) throw httpError(400, 'Unknown product. Use decay-analyzer or titrator.');
   return product;
 }

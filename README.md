@@ -42,6 +42,8 @@ Forgot the password? Run `npm run reset-admin` (creates a new login and prints i
 
 Add `?product=titrator` or `?product=decay-analyzer` to `/api/latest`, `/api/releases` and `/download/latest`.
 With no `product`, they answer for Decay Analyzer, so software that already calls `/api/latest` keeps working.
+Exception: requests from the Titrator software (User-Agent `AutoTitrator/<version>`) without a `product` are answered
+for Titrator, so AutoTitrator 1.3.0 - 1.3.2 (which do not send `?product=titrator`) are never offered a Decay Analyzer release.
 
 Until you publish a release, the site and `GET /api/latest` report version **0.0.0**
 (defined as `DEFAULT_VERSION` in `server.js`). Your software can ignore 0.0.0 and only
