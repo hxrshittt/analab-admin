@@ -197,12 +197,13 @@ setInterval(() => { for (const [ip, a] of attempts) if (Date.now() - a.first > W
 
 // ---------------------------------------------------------------------------
 // Products
-// One website, two software products. Each product has its own list of releases and its own
+// One website, three software products. Each product has its own list of releases and its own
 // "live" version. Old data (saved before Titrator existed) belongs to Decay Analyzer.
 // ---------------------------------------------------------------------------
 const PRODUCTS = {
   'decay-analyzer': { name: 'Decay Analyzer', tagPrefix: '', filePrefix: 'analab-decay-analyzer', releaseName: (v) => `Analab ${v}` },
   titrator: { name: 'Titrator', tagPrefix: 'titrator-', filePrefix: 'analab-titrator', releaseName: (v) => `Analab Titrator ${v}` },
+  analabsafe: { name: 'AnalabSafe', tagPrefix: 'analabsafe-', filePrefix: 'analabsafe', releaseName: (v) => `AnalabSafe ${v}` },
 };
 const DEFAULT_PRODUCT = 'decay-analyzer';
 const productId = (v) => {
@@ -313,6 +314,7 @@ function makeLocalStore() {
 // The repo is the database. Reading works without any local state.
 //   Decay Analyzer releases are tagged   v1.2.3            (unchanged, so existing releases keep working)
 //   Titrator releases are tagged         titrator-v1.2.3
+//   AnalabSafe releases are tagged       analabsafe-v1.2.3
 // GitHub only has one "latest release" per repo, so the live version of each product is remembered with a
 // hidden marker at the end of that release's description.
 // ---------------------------------------------------------------------------
@@ -628,7 +630,7 @@ function queryProduct(req) {
     requested = 'titrator';
   }
   const product = productId(requested);
-  if (!product) throw httpError(400, 'Unknown product. Use decay-analyzer or titrator.');
+  if (!product) throw httpError(400, 'Unknown product. Use decay-analyzer, titrator or analabsafe.');
   return product;
 }
 

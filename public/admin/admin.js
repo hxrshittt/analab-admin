@@ -5,7 +5,8 @@
   var view = $('#view');
   var PRODUCTS = {
     'decay-analyzer': { name: 'Decay Analyzer', page: '/downloads.html' },
-    titrator: { name: 'Titrator', page: '/titrator/downloads.html' }
+    titrator: { name: 'Titrator', page: '/titrator/downloads.html' },
+    analabsafe: { name: 'AnalabSafe', page: '/analabsafe/downloads.html' }
   };
   var saved = null;
   try { saved = localStorage.getItem('analab-admin-product'); } catch (e) { /* storage blocked */ }
@@ -434,13 +435,17 @@
     return load().then(function () {
       if (name === 'edit' && !state.data.releases.some(function (r) { return r.id === arg; })) {
         // the release may belong to the other product (bookmark, refresh): look there before giving up
-        var other = state.product === 'titrator' ? 'decay-analyzer' : 'titrator';
         var keep = state.product;
-        state.product = other;
-        return load().then(function () {
-          if (state.data.releases.some(function (r) { return r.id === arg; })) { setProduct(other); return; }
-          state.product = keep; return load();
-        });
+        var others = Object.keys(PRODUCTS).filter(function (p) { return p !== keep; });
+        var tryNext = function () {
+          if (!others.length) { state.product = keep; return load(); }
+          state.product = others.shift();
+          return load().then(function () {
+            if (state.data.releases.some(function (r) { return r.id === arg; })) { setProduct(state.product); return; }
+            return tryNext();
+          });
+        };
+        return tryNext();
       }
     }).then(function () {
       if (name === 'new') return renderForm();

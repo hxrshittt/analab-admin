@@ -90,7 +90,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function (a) {
         var body = (r.whatsNew.length ? '<b>What\'s New</b><ul>' + list(r.whatsNew) + '</ul>' : '') +
                    (r.fixes.length ? '<b>Bug Fixes</b><ul>' + list(r.fixes) + '</ul>' : '');
         return '<div class="note' + (r.isLatest ? ' open' : '') + ' reveal' + (i > 0 && i < 5 ? ' delay' + i : '') + '">' +
-          '<button>Analab ' + (PRODUCT_NAME ? esc(PRODUCT_NAME) + ' ' : '') + 'v' + esc(r.version) + ' — ' + esc(fmt(r.date, 'long')) + ' <span>' + (r.isLatest ? '−' : '+') + '</span></button>' +
+          '<button>' + (/^Analab/.test(PRODUCT_NAME) ? '' : 'Analab ') + (PRODUCT_NAME ? esc(PRODUCT_NAME) + ' ' : '') + 'v' + esc(r.version) + ' — ' + esc(fmt(r.date, 'long')) + ' <span>' + (r.isLatest ? '−' : '+') + '</span></button>' +
           '<div class="body">' + (body || 'No notes for this release.') + '</div></div>';
       }).join('');
     });
