@@ -116,13 +116,6 @@
     return api('GET', '/api/admin/releases?product=' + encodeURIComponent(state.product)).then(function (d) { state.data = d; });
   }
   function paintProduct() {
-    var logo = $('.side-logo img');
-    if (logo) {
-      var safe = state.product === 'analabsafe';
-      logo.src = safe ? '/assets/analabsafe_logo.png' : '/assets/logo.png';
-      logo.alt = safe ? 'ANALABsafe' : 'Analab';
-      logo.style.height = safe ? 'auto' : '';
-    }
     var pick = $('.product-pick');
     pick.setAttribute('data-active', state.product);
     document.querySelectorAll('.product-pick button').forEach(function (b) {
