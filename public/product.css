@@ -232,3 +232,12 @@ html[data-ps-from="analabsafe"] .pswitch{--tintc:#6d4fd8;--pos:2}
 @media(prefers-reduced-motion:reduce){
   .tw-chart .end-mark,.tw-chart .end-dot,.tw-chart .end-tag,.tw-res{transition:none!important}
 }
+
+/* AnalabSafe home: capability card in the hero's right column */
+.safe-card{align-self:center;background:#fff;border:1px solid #d7e4f5;border-radius:16px;padding:28px;box-shadow:0 18px 44px rgba(20,55,100,.12);max-width:460px;justify-self:center}
+.safe-logo{display:block;width:100%;max-width:340px;margin:0 auto 20px;border-radius:10px}
+.safe-card ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.safe-card li{padding:12px 14px 12px 40px;border-radius:10px;background:#f3f8ff;color:#1c3e63;font-weight:600;font-size:15px;position:relative}
+.safe-card li:before{content:"";position:absolute;left:15px;top:50%;width:12px;height:7px;margin-top:-6px;border-left:2.5px solid #6d4fd8;border-bottom:2.5px solid #6d4fd8;transform:rotate(-45deg)}
+[data-product="analabsafe"] .nav-links{gap:24px;margin-left:20px}[data-product="analabsafe"] .nav-links a{white-space:nowrap}
+.safe-card{margin:70px 0 26px;padding:22px}.safe-card ul{gap:8px}.safe-card li{padding:9px 12px 9px 38px}.safe-logo{margin-bottom:14px;max-width:300px}
