@@ -203,7 +203,7 @@ setInterval(() => { for (const [ip, a] of attempts) if (Date.now() - a.first > W
 const PRODUCTS = {
   'decay-analyzer': { name: 'Decay Analyzer', tagPrefix: '', filePrefix: 'analab-decay-analyzer', releaseName: (v) => `Analab ${v}` },
   titrator: { name: 'Titrator', tagPrefix: 'titrator-', filePrefix: 'analab-titrator', releaseName: (v) => `Analab Titrator ${v}` },
-  analabsafe: { name: 'AnalabSafe', tagPrefix: 'analabsafe-', filePrefix: 'analabsafe', releaseName: (v) => `AnalabSafe ${v}` },
+  analabsafe: { name: 'ANALABsafe', tagPrefix: 'analabsafe-', filePrefix: 'analabsafe', releaseName: (v) => `ANALABsafe ${v}` },
 };
 const DEFAULT_PRODUCT = 'decay-analyzer';
 const productId = (v) => {
@@ -314,7 +314,7 @@ function makeLocalStore() {
 // The repo is the database. Reading works without any local state.
 //   Decay Analyzer releases are tagged   v1.2.3            (unchanged, so existing releases keep working)
 //   Titrator releases are tagged         titrator-v1.2.3
-//   AnalabSafe releases are tagged       analabsafe-v1.2.3
+//   ANALABsafe releases are tagged       analabsafe-v1.2.3
 // GitHub only has one "latest release" per repo, so the live version of each product is remembered with a
 // hidden marker at the end of that release's description.
 // ---------------------------------------------------------------------------
@@ -629,8 +629,8 @@ function queryProduct(req) {
   if ((requested == null || requested === '') && /^AutoTitrator\//i.test(String(req.get('user-agent') || ''))) {
     requested = 'titrator';
   }
-  if ((requested == null || requested === '') && /^AnalabSafe\//i.test(String(req.get('user-agent') || ''))) {
-    requested = 'analabsafe'; // same for AnalabSafe builds that send the User-Agent "AnalabSafe/<version>"
+  if ((requested == null || requested === '') && /^ANALABsafe\//i.test(String(req.get('user-agent') || ''))) {
+    requested = 'analabsafe'; // same for ANALABsafe builds that send the User-Agent "ANALABsafe/<version>"
   }
   const product = productId(requested);
   if (!product) throw httpError(400, 'Unknown product. Use decay-analyzer, titrator or analabsafe.');

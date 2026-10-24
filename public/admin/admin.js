@@ -6,7 +6,7 @@
   var PRODUCTS = {
     'decay-analyzer': { name: 'Decay Analyzer', page: '/downloads.html' },
     titrator: { name: 'Titrator', page: '/titrator/downloads.html' },
-    analabsafe: { name: 'AnalabSafe', page: '/analabsafe/downloads.html' }
+    analabsafe: { name: 'ANALABsafe', page: '/analabsafe/downloads.html' }
   };
   var saved = null;
   try { saved = localStorage.getItem('analab-admin-product'); } catch (e) { /* storage blocked */ }
@@ -116,6 +116,13 @@
     return api('GET', '/api/admin/releases?product=' + encodeURIComponent(state.product)).then(function (d) { state.data = d; });
   }
   function paintProduct() {
+    var logo = $('.side-logo img');
+    if (logo) {
+      var safe = state.product === 'analabsafe';
+      logo.src = safe ? '/assets/analabsafe_logo.png' : '/assets/logo.png';
+      logo.alt = safe ? 'ANALABsafe' : 'Analab';
+      logo.style.height = safe ? 'auto' : '';
+    }
     var pick = $('.product-pick');
     pick.setAttribute('data-active', state.product);
     document.querySelectorAll('.product-pick button').forEach(function (b) {

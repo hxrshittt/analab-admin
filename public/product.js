@@ -1,5 +1,5 @@
 /*
- * Product switcher (Titrator | Decay Analyzer | AnalabSafe)
+ * Product switcher (Titrator | Decay Analyzer | ANALABsafe)
  *
  * The two options are real links, so middle-click, copy-link and "open in new tab" all work. On top of that:
  *  - press and hold lifts the glass lens, drag it and it follows your finger, release and it settles on the nearest side
