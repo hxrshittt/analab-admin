@@ -18,11 +18,12 @@
 /* two soft lights behind the glass, one per product, so the glass has something to bend */
 .pswitch-wrap .orb{position:absolute;top:8px;width:116px;height:40px;border-radius:50%;filter:blur(14px);opacity:.6;pointer-events:none}
 .orb-t{left:26px;background:#22c7b4}
-.orb-d{right:26px;background:#3d8df2}
+.orb-d{left:50%;margin-left:-58px;background:#3d8df2}
+.orb-s{right:26px;background:#8b6bf0}
 
 .pswitch{
   --tintc:#1268d8;--pos:1;
-  position:relative;display:grid;grid-template-columns:1fr 1fr;padding:4px;border-radius:999px;pointer-events:auto;
+  position:relative;display:grid;grid-template-columns:repeat(3,1fr);padding:4px;border-radius:999px;pointer-events:auto;
   touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
   background:linear-gradient(180deg,rgba(255,255,255,.68),rgba(255,255,255,.36));
   -webkit-backdrop-filter:blur(18px) saturate(190%);backdrop-filter:blur(18px) saturate(190%);
@@ -35,12 +36,14 @@
 }
 .pswitch[data-active="titrator"]{--tintc:#0a9c8f;--pos:0}
 .pswitch[data-active="decay-analyzer"]{--tintc:#1268d8;--pos:1}
+.pswitch[data-active="analabsafe"]{--tintc:#6d4fd8;--pos:2}
 /* arriving from the other product: start where the glass was, then slide across (see product.js) */
 html[data-ps-from="titrator"] .pswitch{--tintc:#0a9c8f;--pos:0}
 html[data-ps-from="decay-analyzer"] .pswitch{--tintc:#1268d8;--pos:1}
+html[data-ps-from="analabsafe"] .pswitch{--tintc:#6d4fd8;--pos:2}
 
 .pswitch-opt{
-  position:relative;z-index:2;display:flex;align-items:center;justify-content:center;height:44px;min-width:154px;padding:0 22px;
+  position:relative;z-index:2;display:flex;align-items:center;justify-content:center;height:44px;min-width:140px;padding:0 20px;
   border-radius:999px;font:600 14px/1 Inter,Arial,sans-serif;letter-spacing:-.1px;white-space:nowrap;color:#48678a;
   transition:color .3s ease;-webkit-user-drag:none;
 }
@@ -52,7 +55,7 @@ html[data-ps-from="decay-analyzer"] .pswitch{--tintc:#1268d8;--pos:1}
 
 /* the sliding glass lens */
 .pswitch-thumb{
-  position:absolute;z-index:1;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 2);border-radius:999px;pointer-events:none;
+  position:absolute;z-index:1;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 3);border-radius:999px;pointer-events:none;
   translate:calc(var(--pos) * 100%) 0;scale:var(--s,1);
   background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.52));
   -webkit-backdrop-filter:blur(4px) saturate(230%) brightness(1.07);backdrop-filter:blur(4px) saturate(230%) brightness(1.07);
@@ -102,9 +105,9 @@ html[data-ps-from="decay-analyzer"] .pswitch{--tintc:#1268d8;--pos:1}
 @media(max-width:700px){
   :root{--hdr:76px}
   .pswitch-opt{min-width:0;padding:0 10px;font-size:13px;height:42px}
-  .pswitch{width:min(340px,calc(100vw - 32px))}
+  .pswitch{width:min(380px,calc(100vw - 32px))}
   .pswitch-wrap .orb{width:90px}
-  .orb-t{left:20px}.orb-d{right:20px}
+  .orb-t{left:20px}.orb-d{margin-left:-45px}.orb-s{right:20px}
   .product-bar + main > .section:first-child{padding-top:92px}
 }
 @media(prefers-reduced-motion:reduce){

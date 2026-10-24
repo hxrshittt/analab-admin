@@ -629,6 +629,9 @@ function queryProduct(req) {
   if ((requested == null || requested === '') && /^AutoTitrator\//i.test(String(req.get('user-agent') || ''))) {
     requested = 'titrator';
   }
+  if ((requested == null || requested === '') && /^AnalabSafe\//i.test(String(req.get('user-agent') || ''))) {
+    requested = 'analabsafe'; // same for AnalabSafe builds that send the User-Agent "AnalabSafe/<version>"
+  }
   const product = productId(requested);
   if (!product) throw httpError(400, 'Unknown product. Use decay-analyzer, titrator or analabsafe.');
   return product;

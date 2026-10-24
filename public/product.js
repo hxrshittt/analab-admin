@@ -1,5 +1,5 @@
 /*
- * Product switcher (Titrator | Decay Analyzer)
+ * Product switcher (Titrator | Decay Analyzer | AnalabSafe)
  *
  * The two options are real links, so middle-click, copy-link and "open in new tab" all work. On top of that:
  *  - press and hold lifts the glass lens, drag it and it follows your finger, release and it settles on the nearest side
@@ -74,7 +74,7 @@
   sw.addEventListener('pointerdown', function (e) {
     if (leaving || (e.pointerType === 'mouse' && e.button !== 0)) return;
     var r = sw.getBoundingClientRect();
-    drag = { id: e.pointerId, x: e.clientX, seg: (r.width - 8) / 2, from: current, moved: false, near: current };
+    drag = { id: e.pointerId, x: e.clientX, seg: (r.width - 8) / 3, from: current, moved: false, near: current };
     sw.classList.add('is-pressed');
   });
 
@@ -86,9 +86,9 @@
       drag.moved = true;
       sw.classList.add('is-dragging');
     }
-    var pos = clamp(drag.from + dx / drag.seg, -0.1, 1.1);   // a little give past either end
+    var pos = clamp(drag.from + dx / drag.seg, -0.1, opts.length - 0.9);   // a little give past either end
     setPos(pos);
-    var near = pos > 0.5 ? 1 : 0;
+    var near = clamp(Math.round(pos), 0, opts.length - 1);
     if (near !== drag.near) {
       drag.near = near;
       sw.setAttribute('data-active', opts[near].getAttribute('data-product'));
